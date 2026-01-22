@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# usage: steamos-session-launcher <gpu>
+
+source /tmp/steamdeck-env.sh
+
+GPU=${1:-amd}
+
+case "$GPU" in
+  nvknouveau)
+    exec "$BINARY_BASE_DIR/steamos-session-deck-nvknouveau"
+    ;;
+  nvidia)
+    exec "$BINARY_BASE_DIR/steamos-session-deck-nvidia"
+    ;;
+  nvidiahybrid)
+    exec "$BINARY_BASE_DIR/steamos-session-deck-nvidiahybrid"
+    ;;
+  amd)
+    exec "$BINARY_BASE_DIR/steamos-session-deck-amd"
+    ;;
+  intel)
+    exec "$BINARY_BASE_DIR/steamos-session-deck-intel"
+    ;;
+  *)
+    echo "Unknown GPU: $GPU"
+    exit 1
+    ;;
+esac
