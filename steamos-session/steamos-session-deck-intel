@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+# ────────────────────────────────────────────────
+# Intel / Mesa / ANV
+# ────────────────────────────────────────────────
+
+# Force Intel ANV Vulkan driver
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/intel_icd.x86_64.json
+
+# Proton / Wayland
+export PROTON_ENABLE_WAYLAND=1
+
+# DXVK / vkd3d
+export DXVK_ASYNC=1                      # optional shader stutter reduction
+export VKD3D_CONFIG=dxr11                # safer DX12 path on Intel
+
+# HDR path (Mesa + gamescope)
+export PROTON_ENABLE_HDR=1
+export DXVK_HDR=1
+export ENABLE_HDR_WSI=1
+export ENABLE_GAMESCOPE_WSI=1
+
+# Frame pacing / VRR
+export vblank_mode=0
+export MESA_VK_WSI_PRESENT_MODE=mailbox
+
+# Intel perf / threading
+export INTEL_DEBUG=nothrottle            # avoids rare downclocking
+export mesa_glthread=true                # helps some GL titles
+
+# Optional stability toggles
+# export ANV_DEBUG=async                  # experimental, Arc only
+# export VKD3D_SHADER_MODEL=6_6           # if a game requires it
+
+# ────────────────────────────────────────────────
+# Gamescope + Steam launch
+# ────────────────────────────────────────────────
+
+# Clear The Screen
+clear
+
+# Welcome Mesage
+echo "Welcome to tty3 – launching SteamOS Gaming Mode..."
+sleep 5
+
+# Launch gamescope + steam
+gamescope \
+  -w "$SCREENWIDTH" -h "$SCREENHEIGHT" \
+  -r "$REFRESHRATE" \
+  -f -e \
+  --steam --mangoapp \
+  --adaptive-sync --immediate-flips --force-grab-cursor \
+  --hdr-enabled \
+  -- \
+  steam -steamdeck -steamos3 -gamepadui 2>/dev/null
+
+# Clear The Screen
+clear
+
+# Exit Message
+echo "Exitting to tty1 – Exitting SteamOS Gaming Mode..."
+sleep 5
+
+# Clear The Screen
+clear
+
+# Switch back (use 1 or detect dynamically if possible)
+chvt "$PLASMA_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys

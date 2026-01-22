@@ -1,0 +1,7 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Name=Switch to tty3 (Gaming Mode)
+Exec=bash -c "pkill -9 -t tty3; pkexec chvt 3"
+Icon=/home/artofmusic/.local/share/icons/distributor-logo-steamdeck.svg
+Type=Application
+Terminal=false

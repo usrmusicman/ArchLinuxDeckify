@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+# ────────────────────────────────────────────────
+# NVIDIA open stack: nouveau + NVK (Mesa)
+# ────────────────────────────────────────────────
+
+# Force NVK Vulkan driver (Mesa)
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json
+
+# Ensure Mesa path, not NVIDIA proprietary
+unset __GLX_VENDOR_LIBRARY_NAME
+unset PROTON_ENABLE_NVAPI
+unset PROTON_HIDE_NVIDIA_GPU
+
+# Wayland + Proton
+export PROTON_ENABLE_WAYLAND=1
+
+# DXVK / vkd3d
+export DXVK_ASYNC=1                     # shader stutter reduction
+export VKD3D_CONFIG=dxr11               # DX12 RT still experimental
+
+# HDR path (NVK supports HDR via gamescope)
+export PROTON_ENABLE_HDR=1
+export DXVK_HDR=1
+export ENABLE_HDR_WSI=1
+export ENABLE_GAMESCOPE_WSI=1
+
+# Mesa / nouveau performance & stability
+export MESA_LOADER_DRIVER_OVERRIDE=nouveau
+export vblank_mode=0
+export MESA_VK_WSI_PRESENT_MODE=mailbox
+
+# NVK tuning
+export NVK_DEBUG=sync                   # improves stability on some GPUs
+export NOUVEAU_MESA_DEBUG=1             # optional logging
+
+# ────────────────────────────────────────────────
+# Gamescope + Steam launch
+# ────────────────────────────────────────────────
+
+# Clear The Screen
+clear
+
+# Welcome Mesage
+echo "Welcome to tty3 – launching SteamOS Gaming Mode..."
+sleep 5
+
+# Launch gamescope + steam
+gamescope \
+  -w "$SCREENWIDTH" -h "$SCREENHEIGHT" \
+  -r "$REFRESHRATE" \
+  -f -e \
+  --steam --mangoapp \
+  --adaptive-sync --immediate-flips --force-grab-cursor \
+  --hdr-enabled \
+  -- \
+  steam -steamdeck -steamos3 -gamepadui 2>/dev/null
+
+# Clear The Screen
+clear
+
+# Exit Message
+echo "Exitting to tty1 – Exitting SteamOS Gaming Mode..."
+sleep 5
+
+# Clear The Screen
+clear
+
+# Switch back (use 1 or detect dynamically if possible)
+chvt "$PLASMA_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys

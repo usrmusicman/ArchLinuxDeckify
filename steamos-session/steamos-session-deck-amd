@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+# ────────────────────────────────────────────────
+# AMD / Mesa / RADV
+# ────────────────────────────────────────────────
+
+# Ensure RADV is used (safe even if already default)
+export AMD_VULKAN_ICD=RADV
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
+
+# Proton / DXVK / vkd3d
+export PROTON_ENABLE_WAYLAND=1
+export DXVK_ASYNC=1                     # optional, reduces shader stutter
+export RADV_PERFTEST=nggc               # faster shader compilation (RDNA2+)
+
+# HDR path (Mesa + gamescope)
+export PROTON_ENABLE_HDR=1
+export DXVK_HDR=1
+export ENABLE_HDR_WSI=1
+export ENABLE_GAMESCOPE_WSI=1
+
+# Optional frame pacing / latency
+export vblank_mode=0                    # avoid GL blocking
+export MESA_VK_WSI_PRESENT_MODE=mailbox # good for VRR
+
+# Optional: Ultra-Low-Latency Mode (AMD equivalent of Reflex)
+export RADV_FORCE_VRS=1
+export RADV_TEX_ANISO=16
+
+# Optional: debug / stability toggles
+# export RADV_DEBUG=nohiz                # if you hit rare depth bugs
+# export VKD3D_CONFIG=dxr11              # DXR fallback if RT titles misbehave
+
+# ────────────────────────────────────────────────
+# Gamescope + Steam launch
+# ────────────────────────────────────────────────
+
+# Clear The Screen
+clear
+
+# Welcome Mesage
+echo "Welcome to tty3 – launching SteamOS Gaming Mode..."
+sleep 5
+
+# Launch gamescope + steam
+gamescope \
+  -w "$SCREENWIDTH" -h "$SCREENHEIGHT" \
+  -r "$REFRESHRATE" \
+  -f -e \
+  --steam --mangoapp \
+  --adaptive-sync --immediate-flips --force-grab-cursor \
+  --hdr-enabled \
+  -- \
+  steam -steamdeck -steamos3 -gamepadui 2>/dev/null
+
+# Clear The Screen
+clear
+
+# Exit Message
+echo "Exitting to tty1 – Exitting SteamOS Gaming Mode..."
+sleep 5
+
+# Clear The Screen
+clear
+
+# Switch back (use 1 or detect dynamically if possible)
+chvt "$PLASMA_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys

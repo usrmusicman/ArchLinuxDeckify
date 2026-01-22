@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+# ────────────────────────────────────────────────
+# NVIDIA-specific (most still useful in 2026)
+# ────────────────────────────────────────────────
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export __GL_MaxFramesAllowed=1               # can help vs tearing
+export PROTON_HIDE_NVIDIA_GPU=0
+export PROTON_ENABLE_NVAPI=1
+
+# Usually helps HDR / swapchain compatibility on recent NVIDIA
+# (try =1 first; =0 if you get crashes)
+export ENABLE_GAMESCOPE_WSI=1
+
+# Optional: force GBM backend (helps some HDR/Vulkan cases)
+export GBM_BACKEND=nvidia-drm
+
+# Faster disk cache streaming
+export __GL_SHADER_DISK_CACHE=1
+export __GL_SHADER_DISK_CACHE_PATH="$HOME/.cache/nvidia"
+
+# ────────────────────────────────────────────────
+# Your display settings
+# ────────────────────────────────────────────────
+SCREENWIDTH=2560
+SCREENHEIGHT=1440
+REFRESHRATE=360          # ← lower to 240/165/144 if HDR/VRR unstable
+
+PLASMA_SESSION_TTY=1
+
+# ────────────────────────────────────────────────
+# Gamescope + Steam launch
+# ────────────────────────────────────────────────
+
+# Clear The Screen
+clear
+
+# Welcome Mesage
+echo "Welcome to tty3 – launching SteamOS Gaming Mode..."
+sleep 5
+
+# Launch gamescope + steam
+gamescope \
+  -w "$SCREENWIDTH" -h "$SCREENHEIGHT" \
+  -r "$REFRESHRATE" \
+  -f -e \
+  --steam --mangoapp \
+  --adaptive-sync --immediate-flips --force-grab-cursor \
+  --hdr-enabled \
+  -- \
+  steam -steamdeck -steamos3 -gamepadui 2>/dev/null
+
+# Clear The Screen
+clear
+
+# Exit Message
+echo "Exitting to tty1 – Exitting SteamOS Gaming Mode..."
+sleep 5
+
+# Clear The Screen
+clear
+
+# Switch back (use 1 or detect dynamically if possible)
+chvt "$PLASMA_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys
