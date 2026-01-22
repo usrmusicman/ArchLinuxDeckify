@@ -1,9 +1,25 @@
 #!/usr/bin/env bash
 
-export ORIGINAL_SESSION_TTY=1
-export STEAMOS_SESSION_TTY=3
+#### Run commands
+if [[ "$EUID" -eq 0 ]]; then
 
-if [[ "$USER" == "root" ]]; then
-    pkill -9 -t tty3
+    # Grab current TTY
+    ORIGINAL_SESSION_TTY=$(fgconsole)
+    STEAMOS_SESSION_TTY=3
+
+    # Persist globally for non-root shells if needed
+    cat > /tmp/steamdeck-env.sh <<EOF
+export ORIGINAL_SESSION_TTY=$ORIGINAL_SESSION_TTY
+export STEAMOS_SESSION_TTY=$STEAMOS_SESSION_TTY
+EOF
+    chmod 644 /tmp/steamdeck-env.sh
+
+    # Attempt graceful shutdown of TTY3 first
+    pkill -t tty${STEAMOS_SESSION_TTY}
+
+    # If processes remain, kill hard
+    pkill -9 -t tty${STEAMOS_SESSION_TTY}
+
+    # Switch to SteamOS session TTY
     chvt $STEAMOS_SESSION_TTY
 fi

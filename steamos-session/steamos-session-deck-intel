@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # List script sources
-source ./steamos-session-bootstrap
+source /tmp/steamdeck-env.sh
 
 # ────────────────────────────────────────────────
 # Intel / Mesa / ANV
@@ -38,6 +38,13 @@ export mesa_glthread=true                # helps some GL titles
 # Optional stability toggles
 # export ANV_DEBUG=async                  # experimental, Arc only
 # export VKD3D_SHADER_MODEL=6_6           # if a game requires it
+
+# ────────────────────────────────────────────────
+# Your display settings
+# ────────────────────────────────────────────────
+SCREENWIDTH=2560
+SCREENHEIGHT=1440
+REFRESHRATE=360          # ← lower to 240/165/144 if HDR/VRR unstable
 
 # ────────────────────────────────────────────────
 # Gamescope + Steam launch

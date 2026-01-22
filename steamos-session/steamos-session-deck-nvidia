@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # List script sources
-source ./steamos-session-bootstrap
+source /tmp/steamdeck-env.sh
 
 # ────────────────────────────────────────────────
 # NVIDIA-specific (most still useful in 2026)
@@ -34,8 +34,6 @@ export __GL_SHADER_DISK_CACHE_PATH="$HOME/.cache/nvidia"
 SCREENWIDTH=2560
 SCREENHEIGHT=1440
 REFRESHRATE=360          # ← lower to 240/165/144 if HDR/VRR unstable
-
-PLASMA_SESSION_TTY=1
 
 # ────────────────────────────────────────────────
 # Gamescope + Steam launch
@@ -70,4 +68,4 @@ sleep 5
 clear
 
 # Switch back (use 1 or detect dynamically if possible)
-chvt "$ORIGINAL_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys
+chvt "$ORIGINAL_SESSION_TTY"  # fallback to common GUI ttys
