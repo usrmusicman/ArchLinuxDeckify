@@ -42,13 +42,6 @@ export NVK_DEBUG=sync                   # improves stability on some GPUs
 export NOUVEAU_MESA_DEBUG=1             # optional logging
 
 # ────────────────────────────────────────────────
-# Your display settings
-# ────────────────────────────────────────────────
-SCREENWIDTH=2560
-SCREENHEIGHT=1440
-REFRESHRATE=360          # ← lower to 240/165/144 if HDR/VRR unstable
-
-# ────────────────────────────────────────────────
 # Gamescope + Steam launch
 # ────────────────────────────────────────────────
 

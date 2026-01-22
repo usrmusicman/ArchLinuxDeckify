@@ -39,13 +39,6 @@ export RADV_TEX_ANISO=16
 # export VKD3D_CONFIG=dxr11              # DXR fallback if RT titles misbehave
 
 # ────────────────────────────────────────────────
-# Your display settings
-# ────────────────────────────────────────────────
-SCREENWIDTH=2560
-SCREENHEIGHT=1440
-REFRESHRATE=360          # ← lower to 240/165/144 if HDR/VRR unstable
-
-# ────────────────────────────────────────────────
 # Gamescope + Steam launch
 # ────────────────────────────────────────────────
 

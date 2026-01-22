@@ -29,13 +29,6 @@ export __GL_SHADER_DISK_CACHE=1
 export __GL_SHADER_DISK_CACHE_PATH="$HOME/.cache/nvidia"
 
 # ────────────────────────────────────────────────
-# Your display settings
-# ────────────────────────────────────────────────
-SCREENWIDTH=2560
-SCREENHEIGHT=1440
-REFRESHRATE=360          # ← lower to 240/165/144 if HDR/VRR unstable
-
-# ────────────────────────────────────────────────
 # Gamescope + Steam launch
 # ────────────────────────────────────────────────
 
