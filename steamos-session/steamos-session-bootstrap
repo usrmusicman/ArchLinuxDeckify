@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
+export ORIGINAL_SESSION_TTY=1
 export STEAMOS_SESSION_TTY=3
 
 if [[ "$USER" == "root" ]]; then
-    export ORIGINAL_SESSION_TTY=$(fgconsole)
+    pkill -9 -t tty3
     chvt $STEAMOS_SESSION_TTY
 fi
