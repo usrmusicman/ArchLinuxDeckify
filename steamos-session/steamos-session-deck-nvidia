@@ -3,6 +3,12 @@
 # ────────────────────────────────────────────────
 # NVIDIA-specific (most still useful in 2026)
 # ────────────────────────────────────────────────
+
+# Make sure a wayland session is set correctly
+export XDG_SESSION_TYPE=wayland
+export SDL_VIDEODRIVER=wayland
+
+# Nvidia Specific
 export __GLX_VENDOR_LIBRARY_NAME=nvidia
 export __GL_MaxFramesAllowed=1               # can help vs tearing
 export PROTON_HIDE_NVIDIA_GPU=0

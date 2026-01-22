@@ -4,6 +4,10 @@
 # NVIDIA open stack: nouveau + NVK (Mesa)
 # ────────────────────────────────────────────────
 
+# Make sure a wayland session is set correctly
+export XDG_SESSION_TYPE=wayland
+export SDL_VIDEODRIVER=wayland
+
 # Force NVK Vulkan driver (Mesa)
 export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json
 

@@ -4,6 +4,10 @@
 # Intel / Mesa / ANV
 # ────────────────────────────────────────────────
 
+# Make sure a wayland session is set correctly
+export XDG_SESSION_TYPE=wayland
+export SDL_VIDEODRIVER=wayland
+
 # Force Intel ANV Vulkan driver
 export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/intel_icd.x86_64.json
 
