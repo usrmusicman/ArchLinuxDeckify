@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# List script sources
+source ./steamos-session-bootstrap
+
 # ────────────────────────────────────────────────
 # AMD / Mesa / RADV
 # ────────────────────────────────────────────────
@@ -68,4 +71,4 @@ sleep 5
 clear
 
 # Switch back (use 1 or detect dynamically if possible)
-chvt "$PLASMA_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys
+chvt "$ORIGINAL_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys
