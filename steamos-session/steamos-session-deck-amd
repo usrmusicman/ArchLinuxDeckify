@@ -1,74 +1,80 @@
 #!/usr/bin/env bash
 
-# List script sources
-source /tmp/steamdeck-env.sh
+# ------------------------------------------------
+# Find Configuration File
+# ------------------------------------------------
 
-# ────────────────────────────────────────────────
-# AMD / Mesa / RADV
-# ────────────────────────────────────────────────
+if [ -z "$SYSTEM_GPU" ]; then
 
-# Make sure a wayland session is set correctly
-export XDG_SESSION_TYPE=wayland
-export SDL_VIDEODRIVER=wayland
+  # Source configuration file
+  source "$STEAMOS_SESSION_CONFIG"
 
-# Ensure RADV is used (safe even if already default)
+fi
+
+# ------------------------------------------------
+# AMD High-Performance Gaming Environment
+# ------------------------------------------------
+
+# Ensure we use the community-standard RADV driver (Superior to AMDVLK for gaming)
 export AMD_VULKAN_ICD=RADV
-export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
 
-# Proton / DXVK / vkd3d
-export PROTON_ENABLE_WAYLAND=1
-export DXVK_ASYNC=1                     # optional, reduces shader stutter
-export RADV_PERFTEST=nggc               # faster shader compilation (RDNA2+)
+# [GPL]: Eliminates shader compilation stutter (The #1 fix for Linux gaming)
+# [NGGC]: Next-Gen Geometry Culling - Speeds up rendering on RDNA 2/3/4 cards
+# [SAM]: Forces Smart Access Memory for faster CPU-to-GPU communication
+export RADV_PERFTEST=gpl,nggc,sam
 
-# HDR path (Mesa + gamescope)
-export PROTON_ENABLE_HDR=1
-export DXVK_HDR=1
-export ENABLE_HDR_WSI=1
-export ENABLE_GAMESCOPE_WSI=1
-
-# Optional frame pacing / latency
-export vblank_mode=0                    # avoid GL blocking
-export MESA_VK_WSI_PRESENT_MODE=mailbox # good for VRR
-
-# Optional: Ultra-Low-Latency Mode (AMD equivalent of Reflex)
+# VRS=1 forces 1x1 shading (Full Quality). Use 2 or 2x2 if you need more FPS for 360Hz.
 export RADV_FORCE_VRS=1
+
+# Forces 16x Anisotropic Filtering at the driver level for crisper textures
 export RADV_TEX_ANISO=16
 
-# Optional: debug / stability toggles
-# export RADV_DEBUG=nohiz                # if you hit rare depth bugs
-# export VKD3D_CONFIG=dxr11              # DXR fallback if RT titles misbehave
+# [nocompute]: Simplifies the GPU queue to prevent micro-stutters/pacing issues
+export RADV_DEBUG=nocompute
 
-# ────────────────────────────────────────────────
-# Gamescope + Steam launch
-# ────────────────────────────────────────────────
+# Enables the persistent disk cache for shaders (Speeds up game launch times)
+export RADV_SHADER_CACHE=1
 
-# Clear The Screen
+# Points specifically to the 64-bit Mesa Radeon Vulkan driver path
+export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
+
+# ------------------------------------------------
+# Steamdeck Gamescope UI Session
+# ------------------------------------------------
+
+# 1. Silencing systemctl and pkill (Added -q and &>/dev/null)
+sudo /usr/bin/systemctl mask getty@tty${DESKTOP_TTY}.service 2>/dev/null
+pkill -9 kwin_wayland 2>/dev/null
 clear
 
-# Welcome Mesage
-echo "Welcome to tty3 – launching SteamOS Gaming Mode..."
-sleep 5
-
-# Launch gamescope + steam
+# 2. Run Gamescope with Upscaling Logic
+# -w/-h = Internal Render (What the game thinks it is)
+# -W/-H = Physical Output (The Monitor's resolution)
 gamescope \
-  -w "$SCREENWIDTH" -h "$SCREENHEIGHT" \
+  -w "$RENDER_WIDTH" \
+  -h "$RENDER_HEIGHT" \
+  -W "$SCREENWIDTH" \
+  -H "$SCREENHEIGHT" \
   -r "$REFRESHRATE" \
-  -f -e \
-  --steam --mangoapp \
-  --adaptive-sync --immediate-flips --force-grab-cursor \
+  -f \
+  --adaptive-sync \
+  --immediate-flips \
+  --force-grab-cursor \
+  -S fit \
+  -F "$UPSCALE_FILTER" \
+  --sharpness "$SHARPNESS" \
   --hdr-enabled \
+  --mangoapp \
+  --steam \
+  --xwayland-count 2 \
   -- \
-  steam -steamdeck -steamos3 -gamepadui 2>/dev/null
+  steam -steamdeck -steamos3 -gamepadui >/dev/null 2>$HOME/.steamos-session-gamescope.log
 
-# Clear The Screen
+# 3. Cleanup (Silenced)
+sudo /usr/bin/systemctl unmask getty@tty${DESKTOP_TTY}.service 2>/dev/null
+sudo /usr/bin/systemctl restart getty@tty${DESKTOP_TTY}.service 2>/dev/null
+sudo /usr/bin/chvt $DESKTOP_TTY &>/dev/null
+
+sudo /usr/bin/systemctl mask getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
 clear
-
-# Exit Message
-echo "Exitting to tty1 – Exitting SteamOS Gaming Mode..."
-sleep 5
-
-# Clear The Screen
-clear
-
-# Switch back (use 1 or detect dynamically if possible)
-chvt "$ORIGINAL_SESSION_TTY" || chvt 1 || chvt 7  # fallback to common GUI ttys
+sudo /usr/bin/systemctl stop getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null

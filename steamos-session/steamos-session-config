@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# NO execution, NO sourcing of launchers
+
+# ------------------------------------------------
+# MONITOR & UPSCALING & POWER SETTINGS
+# ------------------------------------------------
+
+# Target Monitor (Output)
+export SCREENWIDTH=2560
+export SCREENHEIGHT=1440
+export REFRESHRATE=360
+
+# Internal Render Resolution (The "Game" resolution)
+# Example: Set to 1920x1080 to upscale to 1440p
+export RENDER_WIDTH=2560
+export RENDER_HEIGHT=1440
+
+# Upscaling Method: 'fsr', 'nis', or 'linear'
+export UPSCALE_FILTER="nis"
+export SHARPNESS=2
+
+# GPU POWER LIMIT in Watts
+export GPU_PW_LIMIT=320 # remember to change this number in your /etc/sudoers.d/archlinuxdeckify-root-overrides file to match the value here.
+
+# ------------------------------------------------
+# Common Proton / Gamescope / Steam defaults
+# ------------------------------------------------
+
+# SESSION TYPE SETTINGS
+export XDG_SESSION_TYPE=wayland
+export SDL_VIDEODRIVER=wayland
+export XDG_CURRENT_DESKTOP=gamescope
+
+# Wayland + Gamescope
+export PROTON_ENABLE_WAYLAND=1
+export ENABLE_GAMESCOPE_WSI=1
+
+# HDR
+export PROTON_ENABLE_HDR=1
+export DXVK_HDR=1
+export ENABLE_HDR_WSI=1
+
+# Frame pacing / VRR
+export vblank_mode=0
+export MESA_VK_WSI_PRESENT_MODE=mailbox
+
+# DX12
+export VKD3D_CONFIG=dxr
+
+# ------------------------------------------------
+# Path Defintions (Dynamic based on home)
+# ------------------------------------------------
+BASE_BIN="$HOME/.local/bin/steamos-session"
+export STEAMOS_SESSION_AMD="$BASE_BIN/steamos-session-deck-amd"
+export STEAMOS_SESSION_INTEL="$BASE_BIN/steamos-session-deck-intel"
+export STEAMOS_SESSION_MESA="$BASE_BIN/steamos-session-deck-mesa"
+export STEAMOS_SESSION_NVIDIA="$BASE_BIN/steamos-session-deck-nvidia"
+export STEAMOS_SESSION_NVIDIA_HYBRID="$BASE_BIN/steamos-session-deck-nvidiahybrid"
+export STEAMOS_SESSION_NVIDIA_NVK="$BASE_BIN/steamos-session-deck-nvknouveau"
+
+# ------------------------------------------------
+# Font Text Colors
+# ------------------------------------------------
+export BLUE='\033[1;34m'
+export GREEN='\033[1;32m'
+export RED='\033[1;31m'
+export YELLOW='\033[1;33m'
+export TEAL='\033[1;36m'
+export MAGENTA='\033[1;35m' # Fixed typo
+export WHITE='\033[0m'
+export NC='\033[0m'         # Added No Color
+
+# ------------------------------------------------
+# Misc
+# ------------------------------------------------
+export DESKTOP_TTY="2"
+export STEAMDECKUI_TTY="1"
+export STEAM_GAMESCOPE_HAS_HDR=1
+export STEAM_USE_ANY_CONFIG=1
+export XDG_RUNTIME_DIR=/run/user/$(id -u artofmusic)
+
+# ------------------------------------------------
+# Debugging
+# ------------------------------------------------
+# Only log if we haven't already logged in this process tree
+if [ -z "$ENV_LOGGED" ]; then
+    export -p > "$HOME/steamos-session-env.log"
+    export ENV_LOGGED=1
+fi

@@ -1,7 +1,0 @@
-#!/usr/bin/env xdg-open
-[Desktop Entry]
-Name=Switch to tty3 (Gaming Mode)
-Exec=bash -c "pkexec /home/username/.local/bin/steamos-session/steamos-session-bootstrap"
-Icon=/home/username/.local/share/icons/distributor-logo-steamdeck.svg
-Type=Application
-Terminal=false

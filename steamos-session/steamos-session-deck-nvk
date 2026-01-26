@@ -12,33 +12,46 @@ if [ -z "$SYSTEM_GPU" ]; then
 fi
 
 # ------------------------------------------------
-# Intel High-Performance Gaming Environment
+# Nvidia NVK+Nouveau High-Performance Gaming Environment
 # ------------------------------------------------
 
-# [nothrottle]: Disables driver-side frequency throttling to keep clocks pinned
-# [rebind]: Helps with memory management on Arc/Xe architectures
-export INTEL_DEBUG=nothrottle,rebind
+# Essential: Clean the slate so the proprietary driver paths don't conflict
+unset __GLX_VENDOR_LIBRARY_NAME
+unset PROTON_ENABLE_NVAPI
+unset PROTON_HIDE_NVIDIA_GPU
 
-# Enables multi-threaded OpenGL/Vulkan command submission
+# Force the Nouveau/Mesa path
+export MESA_LOADER_DRIVER_OVERRIDE=nouveau
+
+# [NVK_DEBUG]: 'sync' ensures better frame pacing in Gamescope
+# [NOUVEAU_MESA_DEBUG]: 'true' enables internal Mesa optimizations
+export NVK_DEBUG=sync
+export NOUVEAU_MESA_DEBUG=1
+
+# [2026 NVK EXTRAS]: Enable multi-threaded shader compilation
+# This is crucial to avoid massive stutters on FOSS NVIDIA drivers
+export NVK_PERFTEST=gpl
 export mesa_glthread=true
 
-# [ANV_ENABLE_FBC]: Enables Frame Buffer Compression to save bandwidth
-export ANV_ENABLE_FBC=1
+# Standard 64-bit NVK Vulkan ICD path
+export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json"
 
-# [INTEL_MEASURE]: Optimization for internal pipeline tracking (Set to 0 for pure speed)
-export INTEL_MEASURE=0
+# --- [EXPERIMENTAL] NVIDIA NOVA FOSS Environment ---
 
-# Standard 64-bit Intel Vulkan ICD path
-export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
+# Directing the system to the new Rust-based kernel module
+#export MESA_LOADER_DRIVER_OVERRIDE=nova
+
+# Enable the early Ray Tracing paths in the NVK driver
+#export NVK_DEBUG=rt
 
 # ------------------------------------------------
 # Steamdeck Gamescope UI Session
 # ------------------------------------------------
 
-# 1. Silencing systemctl and pkill (Added -q and &>/dev/null)
+# Silencing systemctl and pkill (Added -q and &>/dev/null)
 sudo /usr/bin/systemctl mask getty@tty${DESKTOP_TTY}.service 2>/dev/null
 pkill -9 kwin_wayland 2>/dev/null
-clear
+sleep 2
 
 # 2. Run Gamescope with Upscaling Logic
 # -w/-h = Internal Render (What the game thinks it is)

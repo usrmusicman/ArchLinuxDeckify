@@ -12,24 +12,11 @@ if [ -z "$SYSTEM_GPU" ]; then
 fi
 
 # ------------------------------------------------
-# Intel High-Performance Gaming Environment
+# Generic/Unknown GPU High-Performance Gaming Environment
 # ------------------------------------------------
 
-# [nothrottle]: Disables driver-side frequency throttling to keep clocks pinned
-# [rebind]: Helps with memory management on Arc/Xe architectures
-export INTEL_DEBUG=nothrottle,rebind
-
-# Enables multi-threaded OpenGL/Vulkan command submission
+# mesa_glthread is safe for almost 99% of Mesa-supported drivers and helps CPU overhead.
 export mesa_glthread=true
-
-# [ANV_ENABLE_FBC]: Enables Frame Buffer Compression to save bandwidth
-export ANV_ENABLE_FBC=1
-
-# [INTEL_MEASURE]: Optimization for internal pipeline tracking (Set to 0 for pure speed)
-export INTEL_MEASURE=0
-
-# Standard 64-bit Intel Vulkan ICD path
-export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
 
 # ------------------------------------------------
 # Steamdeck Gamescope UI Session

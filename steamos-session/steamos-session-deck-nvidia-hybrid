@@ -12,35 +12,52 @@ if [ -z "$SYSTEM_GPU" ]; then
 fi
 
 # ------------------------------------------------
-# Intel High-Performance Gaming Environment
+# NVIDIA + iGPU Hybrid High-Performance Environment
 # ------------------------------------------------
 
-# [nothrottle]: Disables driver-side frequency throttling to keep clocks pinned
-# [rebind]: Helps with memory management on Arc/Xe architectures
-export INTEL_DEBUG=nothrottle,rebind
+# NVIDIA Core Settings
+export __GL_MaxFramesAllowed=1
+export __GL_SHADER_DISK_CACHE=1
+export __GL_SHADER_DISK_CACHE_PATH="$HOME/.cache/nvidia"
 
-# Enables multi-threaded OpenGL/Vulkan command submission
-export mesa_glthread=true
+# Prime Render Offload Logic (The "Handoff")
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __VK_LAYER_NV_optimus=NVIDIA_only
 
-# [ANV_ENABLE_FBC]: Enables Frame Buffer Compression to save bandwidth
-export ANV_ENABLE_FBC=1
+# Wayland/Gamescope Specifics for Hybrid
+export GBM_BACKEND=nvidia-drm
+export PROTON_ENABLE_NVAPI=1
+export PROTON_HIDE_NVIDIA_GPU=0
 
-# [INTEL_MEASURE]: Optimization for internal pipeline tracking (Set to 0 for pure speed)
-export INTEL_MEASURE=0
+# Disable atomic check to prevent "flip" failures on some laptop panels
+export WLR_DRM_NO_ATOMIC=1
 
-# Standard 64-bit Intel Vulkan ICD path
-export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
+# [2026 LATENCY FIX]: Force the iGPU to wait for the dGPU frame completion.
+# This eliminates the "half-frame" tearing common in Optimus setups.
+export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
+export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nvidia_icd.json"
 
 # ------------------------------------------------
 # Steamdeck Gamescope UI Session
 # ------------------------------------------------
 
-# 1. Silencing systemctl and pkill (Added -q and &>/dev/null)
+# 1. Silencing GPU setup & power logs (Added &>/dev/null)
+sudo /usr/bin/nvidia-smi -pm 1 2>/dev/null
+sudo /usr/bin/nvidia-smi -pl $NVIDIA_PW_LIMIT 2>/dev/null # Optional: Lock power limit
+
+# 2. Log power health silently to file
+{
+  echo "--- GPU Power Health Check ---"
+  nvidia-smi --query-gpu=timestamp,power.draw,power.limit,temperature.gpu --format=csv
+} > $HOME/.steamos-session-gpu-check.log
+
+# 3. Silencing systemctl and pkill (Added -q and &>/dev/null)
 sudo /usr/bin/systemctl mask getty@tty${DESKTOP_TTY}.service 2>/dev/null
 pkill -9 kwin_wayland 2>/dev/null
 clear
 
-# 2. Run Gamescope with Upscaling Logic
+# 4. Run Gamescope with Upscaling Logic
 # -w/-h = Internal Render (What the game thinks it is)
 # -W/-H = Physical Output (The Monitor's resolution)
 gamescope \
@@ -63,7 +80,7 @@ gamescope \
   -- \
   steam -steamdeck -steamos3 -gamepadui >/dev/null 2>$HOME/.steamos-session-gamescope.log
 
-# 3. Cleanup (Silenced)
+# 5. Cleanup (Silenced)
 sudo /usr/bin/systemctl unmask getty@tty${DESKTOP_TTY}.service 2>/dev/null
 sudo /usr/bin/systemctl restart getty@tty${DESKTOP_TTY}.service 2>/dev/null
 sudo /usr/bin/chvt $DESKTOP_TTY &>/dev/null

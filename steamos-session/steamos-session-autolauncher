@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# steamos-session-autolauncher
+
+# ------------------------------------------------
+# SET ENVIRONMENT
+# ------------------------------------------------
+
+# Path to Steam Session Configuration
+export STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
+
+# Path to session scripts
+source "$STEAMOS_SESSION_CONFIG"
+
+# ------------------------------------------------
+# THE DETECTION ENGINE
+# ------------------------------------------------
+
+# 1. Hardware ID Check (More inclusive grep for RTX 40-series)
+# We check for the NVIDIA Vendor ID '10de' directly in the modalias
+HAS_NVIDIA=$(lspci -n | grep "10de")
+HAS_AMD=$(lspci -n | grep -Ei "1002|1022")
+HAS_INTEL=$(lspci -n | grep "8086")
+
+# 2. Driver Status Check
+# On Kernel 6.18 + nvidia-open, we check the module status in sysfs
+IS_NVIDIA_OPEN=false
+if [[ -d /sys/module/nvidia ]]; then
+    IS_NVIDIA_OPEN=true
+fi
+
+# 3. Hybrid Check
+# Count how many VGA/3D controllers have drivers bound to them
+VGA_COUNT=$(lspci -k | grep -Ei "VGA|3D" -A 2 | grep "Kernel driver in use" | wc -l)
+
+# ------------------------------------------------
+# THE LOGIC GATE
+# ------------------------------------------------
+
+# CASE 1: NVIDIA Open/Proprietary Hybrid (Laptop)
+if [[ $VGA_COUNT -gt 1 && -n "$HAS_NVIDIA" && "$IS_NVIDIA_OPEN" == "true" ]]; then
+    echo -e "${TEAL}Starting SteamOS session with an iGPU+NVIDIA Discrete GPU...${NC}"
+    sleep 3
+    exec "$STEAMOS_SESSION_NVIDIA_HYBRID"
+
+# CASE 2: Desktop / Single NVIDIA (Open Modules)
+elif [[ -n "$HAS_NVIDIA" && "$IS_NVIDIA_OPEN" == "true" ]]; then
+    echo -e "${GREEN}Starting SteamOS session with an Nvidia GPU...${NC}"
+    sleep 3
+    exec "$STEAMOS_SESSION_NVIDIA"
+
+# CASE 3: NVIDIA Hardware present but running Nouveau/NVK
+elif [[ -n "$HAS_NVIDIA" && "$IS_NVIDIA_OPEN" == "false" ]]; then
+    echo -e "${YELLOW}Starting SteamOS session with an NVIDIA GPU using FOSS+NVK Drivers...${NC}"
+    sleep 3
+    exec "$STEAMOS_SESSION_NVIDIA_NVK"
+
+# CASE 4: AMD Radeon
+elif [[ -n "$HAS_AMD" ]]; then
+    echo -e "${RED}Starting SteamOS session with an AMD GPU...${NC}"
+    sleep 3
+    exec "$STEAMOS_SESSION_AMD"
+
+# CASE 5: Intel
+elif [[ -n "$HAS_INTEL" ]]; then
+    echo -e "${BLUE}Starting SteamOS session with an Intel GPU...${NC}"
+    sleep 3
+    exec "$STEAMOS_SESSION_INTEL"
+
+# CASE 6: Fallback
+else
+    echo -e "${MAGENTA}Starting SteamOS session with an Generic / Unsupported GPU...${NC}"
+    sleep 3
+    exec "$STEAMOS_SESSION_MESA"
+fi

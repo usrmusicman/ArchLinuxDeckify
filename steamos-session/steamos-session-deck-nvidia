@@ -1,64 +1,110 @@
 #!/usr/bin/env bash
 
-# List script sources
-source /tmp/steamdeck-env.sh
+# ------------------------------------------------
+# Find Configuration File
+# ------------------------------------------------
 
-# ────────────────────────────────────────────────
-# NVIDIA-specific (most still useful in 2026)
-# ────────────────────────────────────────────────
+if [ -z "$SYSTEM_GPU" ]; then
 
-# Make sure a wayland session is set correctly
-export XDG_SESSION_TYPE=wayland
-export SDL_VIDEODRIVER=wayland
+  # Source configuration file
+  source "$STEAMOS_SESSION_CONFIG"
 
-# Nvidia Specific
-export __GLX_VENDOR_LIBRARY_NAME=nvidia
-export __GL_MaxFramesAllowed=1               # can help vs tearing
-export PROTON_HIDE_NVIDIA_GPU=0
-export PROTON_ENABLE_NVAPI=1
+fi
 
-# Usually helps HDR / swapchain compatibility on recent NVIDIA
-# (try =1 first; =0 if you get crashes)
-export ENABLE_GAMESCOPE_WSI=1
+# ------------------------------------------------
+# NVIDIA High-Performance Gaming Environment
+# ------------------------------------------------
 
-# Optional: force GBM backend (helps some HDR/Vulkan cases)
-export GBM_BACKEND=nvidia-drm
+# --- LATENCY & SYNC ---
+# Limits pre-rendered frames. At 360Hz, this is the #1 variable for "instant" mouse feel.
+export __GL_MaxFramesAllowed=1
 
-# Faster disk cache streaming
+# Essential for G-Sync/VRR to function within a Wayland/Gamescope container.
+export __GL_GSYNC_ALLOWED=1
+export __GL_VRR_ALLOWED=1
+
+# --- DRIVER EXECUTION (THE CAUTIONS) ---
+# [CAUTION]: USLEEP is safer for 360Hz. "NOTHING" can starve the CPU and cause freezes.
+export __GL_YIELD="USLEEP"
+
+# Speeds up CPU-to-GPU data transfers. Safe and helpful for high-refresh pacing.
+export __GL_WRITE_COMBINED_MEMORY=1
+
+# --- SHADER CACHE ---
+# Forces the driver to store shaders on disk instead of re-compiling every launch.
 export __GL_SHADER_DISK_CACHE=1
 export __GL_SHADER_DISK_CACHE_PATH="$HOME/.cache/nvidia"
 
-# ────────────────────────────────────────────────
-# Gamescope + Steam launch
-# ────────────────────────────────────────────────
+# --- COMPOSITOR HANDOFF ---
+# Mandatory: Tells applications to use the proprietary NVIDIA driver path.
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export GBM_BACKEND=nvidia-drm
 
-# Clear The Screen
+# [CAUTION]: Removed WLR_DRM_NO_ATOMIC.
+# Modern 2026 drivers REQUIRE Atomic Modesetting for stable 360Hz/HDR output.
+# If you see flickering, re-enable only as a last resort.
+
+# Fixes invisible or glitchy cursors in Gamescope.
+export WLR_NO_HARDWARE_CURSORS=1
+
+# --- PROTON & FEATURES ---
+# Enables the bridge between Windows games and your NVIDIA driver features.
+export PROTON_ENABLE_NVAPI=1
+export PROTON_HIDE_NVIDIA_GPU=0
+
+# [NEW 2026]: Restricts libs to 64-bit to prevent performance regressions on RTX 40-series.
+export PROTON_NVIDIA_LIBS_NO_32BIT=1
+
+# Points specifically to your NVIDIA Vulkan implementation.
+export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nvidia_icd.json"
+
+# ------------------------------------------------
+# Steamdeck Gamescope UI Session
+# ------------------------------------------------
+
+# 1. Silencing GPU setup & power logs (Added &>/dev/null)
+sudo /usr/bin/nvidia-smi -pm 1 2>/dev/null
+sudo /usr/bin/nvidia-smi -pl $NVIDIA_PW_LIMIT 2>/dev/null # Optional: Lock power limit
+
+# 2. Log power health silently to file
+{
+  echo "--- GPU Power Health Check ---"
+  nvidia-smi --query-gpu=timestamp,power.draw,power.limit,temperature.gpu --format=csv
+} > $HOME/.steamos-session-gpu-check.log
+
+# 3. Silencing systemctl and pkill (Added -q and &>/dev/null)
+sudo /usr/bin/systemctl mask getty@tty${DESKTOP_TTY}.service 2>/dev/null
+pkill -9 kwin_wayland 2>/dev/null
 clear
 
-# Welcome Mesage
-echo "Welcome to tty3 – launching SteamOS Gaming Mode..."
-sleep 5
-
-# Launch gamescope + steam
+# 4. Run Gamescope with Upscaling Logic
+# -w/-h = Internal Render (What the game thinks it is)
+# -W/-H = Physical Output (The Monitor's resolution)
 gamescope \
-  -w "$SCREENWIDTH" -h "$SCREENHEIGHT" \
+  -w "$RENDER_WIDTH" \
+  -h "$RENDER_HEIGHT" \
+  -W "$SCREENWIDTH" \
+  -H "$SCREENHEIGHT" \
   -r "$REFRESHRATE" \
-  -f -e \
-  --steam --mangoapp \
-  --adaptive-sync --immediate-flips --force-grab-cursor \
+  -f \
+  --adaptive-sync \
+  --immediate-flips \
+  --force-grab-cursor \
+  -S fit \
+  -F "$UPSCALE_FILTER" \
+  --sharpness "$SHARPNESS" \
   --hdr-enabled \
+  --mangoapp \
+  --steam \
+  --xwayland-count 2 \
   -- \
-  steam -steamdeck -steamos3 -gamepadui 2>/dev/null
+  steam -steamdeck -steamos3 -gamepadui >/dev/null 2>$HOME/.steamos-session-gamescope.log
 
-# Clear The Screen
+# 5. Cleanup (Silenced)
+sudo /usr/bin/systemctl unmask getty@tty${DESKTOP_TTY}.service 2>/dev/null
+sudo /usr/bin/systemctl restart getty@tty${DESKTOP_TTY}.service 2>/dev/null
+sudo /usr/bin/chvt $DESKTOP_TTY &>/dev/null
+
+sudo /usr/bin/systemctl mask getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
 clear
-
-# Exit Message
-echo "Exitting to tty1 – Exitting SteamOS Gaming Mode..."
-sleep 5
-
-# Clear The Screen
-clear
-
-# Switch back (use 1 or detect dynamically if possible)
-chvt "$ORIGINAL_SESSION_TTY"  # fallback to common GUI ttys
+sudo /usr/bin/systemctl stop getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
