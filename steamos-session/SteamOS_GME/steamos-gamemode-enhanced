@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# steamos-gamemode-enhanced v3.4 (CLI Only)
+# Includes: Sched-ext, CPU Policy, GPU/USB IRQ, Wi-Fi Jitter, BT Latency, Integrity Checks
+
+# ------------------------------------------------
+# CONFIGURATION & STATE
+# ------------------------------------------------
+CPU_STATE_FILE="/tmp/steamos-gamemode-enhanced-cpu.state"
+IRQ_STATE_FILE="/tmp/steamos-gamemode-enhanced-irq.state"
+WIFI_STATE_FILE="/tmp/steamos-gamemode-enhanced-wifi.state"
+RT_PRIORITY=95
+USB_PRIORITY=94
+
+# ------------------------------------------------
+# LOGGING
+# ------------------------------------------------
+log_step() {
+    local msg="$1"
+    # Clean terminal output with yellow prefix
+    echo -e "\033[1;33m[GAMEMODE]\033[0m $msg"
+}
+
+# ------------------------------------------------
+# INTEGRITY CHECK
+# ------------------------------------------------
+check_requirements() {
+    local missing_tools=()
+    local tools=("iw" "chrt" "pgrep" "scxctl" "sudo")
+
+    for tool in "${tools[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            missing_tools+=("$tool")
+        fi
+    done
+
+    if [ ${#missing_tools[@]} -ne 0 ]; then
+        log_step "ERROR: Missing tools: ${missing_tools[*]}. Please install them (scx-scheds, etc) first."
+        exit 1
+    fi
+}
+
+# ------------------------------------------------
+# HARDWARE MODULES
+# ------------------------------------------------
+get_gpu_irq_names() {
+    case "$1" in
+        nvidia)  echo "nvidia" ;;
+        nouveau) echo "nouveau" ;;
+        amd)     echo "amdgpu" ;;
+        intel)   echo "i915|xe|i915_bpo" ;;
+        *)       echo "none" ;;
+    esac
+}
+
+apply_cpu_governor() {
+    local target_gov=$1
+    if [[ "$target_gov" == "performance" && ! -f "$CPU_STATE_FILE" ]]; then
+        cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor > "$CPU_STATE_FILE" 2>/dev/null
+    fi
+    log_step "CPU: Setting policies to $target_gov"
+    for policy in /sys/devices/system/cpu/cpufreq/policy*; do
+        [[ -f "$policy/scaling_governor" ]] && echo "$target_gov" | sudo tee "$policy/scaling_governor" > /dev/null
+    done
+}
+
+manage_wifi_latency() {
+    if [[ "$1" == "boost" ]]; then
+        iw dev | grep "Power save: on" > /dev/null && echo "on" > "$WIFI_STATE_FILE" || echo "off" > "$WIFI_STATE_FILE"
+        log_step "NET: Disabling Wi-Fi Power Management"
+        sudo iw dev wlan0 set power_save off 2>/dev/null
+    else
+        [[ "$(cat "$WIFI_STATE_FILE" 2>/dev/null)" == "on" ]] && sudo iw dev wlan0 set power_save on 2>/dev/null
+        rm -f "$WIFI_STATE_FILE"
+        log_step "NET: Restored Wi-Fi State"
+    fi
+}
+
+manage_bt_latency() {
+    local hci_path="/sys/kernel/debug/bluetooth/hci0"
+    if [[ "$1" == "boost" ]]; then
+        log_step "BT: Forcing Low-Latency Bluetooth"
+        if [[ -d "$hci_path" ]]; then
+            echo 6 | sudo tee "$hci_path/conn_min_interval" > /dev/null 2>&1
+            echo 7 | sudo tee "$hci_path/conn_max_interval" > /dev/null 2>&1
+        fi
+    else
+        log_step "BT: Restoring Bluetooth Defaults"
+        if [[ -d "$hci_path" ]]; then
+            echo 24 | sudo tee "$hci_path/conn_min_interval" > /dev/null 2>&1
+            echo 40 | sudo tee "$hci_path/conn_max_interval" > /dev/null 2>&1
+        fi
+    fi
+}
+
+# ------------------------------------------------
+# CORE EXECUTION
+# ------------------------------------------------
+enable_performance() {
+    check_requirements
+    log_step "INIT: Starting Nuclear Optimization"
+
+    # 1. Sched-ext (LAVD)
+    sudo /usr/bin/scxctl start --sched lavd --mode gaming > /dev/null 2>&1 &
+    log_step "SCHED: LAVD scheduler engaged"
+
+    # 2. CPU / Net / BT
+    apply_cpu_governor "performance"
+    manage_wifi_latency "boost"
+    manage_bt_latency "boost"
+
+    # 3. IRQ Boosting
+    rm -f "$IRQ_STATE_FILE" && touch "$IRQ_STATE_FILE"
+    GPU_REGEX=$(get_gpu_irq_names "$GPU_VENDOR")
+
+    # GPU IRQs
+    if [[ "$GPU_REGEX" != "none" ]]; then
+        IRQS=$(grep -E "$GPU_REGEX" /proc/interrupts | awk -F: '{print $1}' | tr -d ' ')
+        for irq in $IRQS; do
+            PIDS=$(pgrep -f "irq/$irq-")
+            for pid in $PIDS; do
+                if [[ -n "$pid" ]]; then
+                    C_INFO=$(chrt -p "$pid")
+                    POL=$(echo "$C_INFO" | grep "policy" | awk '{print $6}')
+                    PRI=$(echo "$C_INFO" | grep "priority" | awk '{print $6}')
+                    [[ "$POL" == "SCHED_FIFO" ]] && FLG="-f" || [[ "$POL" == "SCHED_RR" ]] && FLG="-r" || FLG="-o"
+                    echo "$pid $FLG $PRI" >> "$IRQ_STATE_FILE"
+                    sudo chrt -f -p "$RT_PRIORITY" "$pid"
+                fi
+            done
+        done
+        log_step "IRQ: GPU boosted to $RT_PRIORITY"
+    fi
+
+    # USB IRQs
+    USB_PIDS=$(pgrep -f "irq/.*xhci_hcd")
+    for upid in $USB_PIDS; do
+        if [[ -n "$upid" ]]; then
+            U_INFO=$(chrt -p "$upid")
+            U_POL=$(echo "$U_INFO" | grep "policy" | awk '{print $6}')
+            U_PRI=$(echo "$U_INFO" | grep "priority" | awk '{print $6}')
+            [[ "$U_POL" == "SCHED_FIFO" ]] && U_FLG="-f" || U_FLG="-o"
+            echo "$upid $U_FLG $U_PRI" >> "$IRQ_STATE_FILE"
+            sudo chrt -f -p "$USB_PRIORITY" "$upid"
+        fi
+    done
+    log_step "IRQ: USB boosted to $USB_PRIORITY"
+}
+
+disable_performance() {
+    log_step "EXIT: Restoring Defaults"
+    sudo /usr/bin/scxctl stop > /dev/null 2>&1
+
+    [[ -f "$CPU_STATE_FILE" ]] && apply_cpu_governor $(cat "$CPU_STATE_FILE") && rm "$CPU_STATE_FILE" || apply_cpu_governor "schedutil"
+    manage_wifi_latency "restore"
+    manage_bt_latency "restore"
+
+    if [[ -f "$IRQ_STATE_FILE" ]]; then
+        while read -r line; do
+            [[ -z "$line" ]] && continue
+            read -r pid flag prio <<< "$line"
+            [[ -n "$pid" && -e "/proc/$pid" ]] && sudo chrt "$flag" -p "$prio" "$pid"
+        done < "$IRQ_STATE_FILE"
+        rm "$IRQ_STATE_FILE"
+    fi
+    log_step "EXIT: Restoration Complete"
+}
+
+# ------------------------------------------------
+# MAIN
+# ------------------------------------------------
+ACTION=$1
+GPU_VENDOR=$2
+
+case "$ACTION" in
+    start)
+        if [[ -z "$GPU_VENDOR" ]]; then
+            log_step "ERROR: GPU vendor (amd|intel|nvidia) required for start."
+            exit 1
+        fi
+        enable_performance
+        ;;
+    stop)
+        disable_performance
+        ;;
+    *)
+        echo "Usage: sudo $0 {start|stop} {amd|intel|nvidia}"
+        exit 1
+        ;;
+esac
