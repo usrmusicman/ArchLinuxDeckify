@@ -1,4 +1,4 @@
-# Allow artofmusic to manage the Steam session and TTYs without a password
+# Allow the %wheel group to manage the Steam session and TTYs without a password
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart getty@tty1.service
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop getty@tty1.service
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl mask getty@tty1.service
@@ -10,4 +10,12 @@
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/chvt
 
 # Nvidia specific power limits changesi
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi 
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-settings
+
+# Latency and system tuning 
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/chrt
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/modprobe snd_hrtimer
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/rtirq
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/scxctl
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor

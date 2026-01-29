@@ -50,13 +50,14 @@ export VKD3D_CONFIG=dxr
 # ------------------------------------------------
 # Path Defintions (Dynamic based on home)
 # ------------------------------------------------
-BASE_BIN="$HOME/.local/bin/steamos-session"
-export STEAMOS_SESSION_AMD="$BASE_BIN/steamos-session-deck-amd"
-export STEAMOS_SESSION_INTEL="$BASE_BIN/steamos-session-deck-intel"
-export STEAMOS_SESSION_MESA="$BASE_BIN/steamos-session-deck-mesa"
-export STEAMOS_SESSION_NVIDIA="$BASE_BIN/steamos-session-deck-nvidia"
-export STEAMOS_SESSION_NVIDIA_HYBRID="$BASE_BIN/steamos-session-deck-nvidiahybrid"
-export STEAMOS_SESSION_NVIDIA_NVK="$BASE_BIN/steamos-session-deck-nvknouveau"
+export STEAMOS_SESSION_PATH="$HOME/.local/bin/steamos-session"
+export STEAMOS_GAMEMODE_ENHANCED="$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced"
+export STEAMOS_SESSION_AMD="$STEAMOS_SESSION_PATH/steamos-session-deck-amd"
+export STEAMOS_SESSION_INTEL="$STEAMOS_SESSION_PATH/steamos-session-deck-intel"
+export STEAMOS_SESSION_MESA="$STEAMOS_SESSION_PATH/steamos-session-deck-mesa"
+export STEAMOS_SESSION_NVIDIA="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia"
+export STEAMOS_SESSION_NVIDIA_HYBRID="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia-hybrid"
+export STEAMOS_SESSION_NVIDIA_NVK="$STEAMOS_SESSION_PATH/steamos-session-deck-nvk"
 
 # ------------------------------------------------
 # Font Text Colors

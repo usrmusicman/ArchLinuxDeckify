@@ -1,74 +1,116 @@
 #!/usr/bin/env bash
-# steamos-session-autolauncher
+# steamos-session-autolauncher (v3.3 - Robust Supervisor)
 
 # ------------------------------------------------
-# SET ENVIRONMENT
+# SETUP
 # ------------------------------------------------
+# Redirect all output to a log file for debugging (viewable in TTY)
+LOG_FILE="/tmp/steamos-autolaunch.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo "--- New Session Launch: $(date) ---"
 
-# Path to Steam Session Configuration
+# Load Configuration
 export STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
+if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
+    source "$STEAMOS_SESSION_CONFIG"
+else
+    echo "ERROR: Config file not found at $STEAMOS_SESSION_CONFIG"
+    exit 1
+fi
 
-# Path to session scripts
-source "$STEAMOS_SESSION_CONFIG"
+# Path to Gamemode Script (Ensure this variable is set in your config, or default it here)
+# Using parameter expansion to default if variable is missing
+GAMEMODE_SCRIPT="${STEAMOS_GAMEMODE_ENHANCED:-$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced}"
 
 # ------------------------------------------------
-# THE DETECTION ENGINE
+# HARDWARE DETECTION
 # ------------------------------------------------
-
-# 1. Hardware ID Check (More inclusive grep for RTX 40-series)
-# We check for the NVIDIA Vendor ID '10de' directly in the modalias
 HAS_NVIDIA=$(lspci -n | grep "10de")
 HAS_AMD=$(lspci -n | grep -Ei "1002|1022")
 HAS_INTEL=$(lspci -n | grep "8086")
 
-# 2. Driver Status Check
-# On Kernel 6.18 + nvidia-open, we check the module status in sysfs
-IS_NVIDIA_OPEN=false
+# Check for Nvidia kernel module (proprietary vs NVK)
+IS_NVIDIA_MODULE_LOADED=false
 if [[ -d /sys/module/nvidia ]]; then
-    IS_NVIDIA_OPEN=true
+    IS_NVIDIA_MODULE_LOADED=true
 fi
 
-# 3. Hybrid Check
-# Count how many VGA/3D controllers have drivers bound to them
+# Count active VGAs for Hybrid detection
 VGA_COUNT=$(lspci -k | grep -Ei "VGA|3D" -A 2 | grep "Kernel driver in use" | wc -l)
 
 # ------------------------------------------------
-# THE LOGIC GATE
+# VENDOR SELECTION
 # ------------------------------------------------
-
-# CASE 1: NVIDIA Open/Proprietary Hybrid (Laptop)
-if [[ $VGA_COUNT -gt 1 && -n "$HAS_NVIDIA" && "$IS_NVIDIA_OPEN" == "true" ]]; then
-    echo -e "${TEAL}Starting SteamOS session with an iGPU+NVIDIA Discrete GPU...${NC}"
-    sleep 3
-    exec "$STEAMOS_SESSION_NVIDIA_HYBRID"
-
-# CASE 2: Desktop / Single NVIDIA (Open Modules)
-elif [[ -n "$HAS_NVIDIA" && "$IS_NVIDIA_OPEN" == "true" ]]; then
-    echo -e "${GREEN}Starting SteamOS session with an Nvidia GPU...${NC}"
-    sleep 3
-    exec "$STEAMOS_SESSION_NVIDIA"
-
-# CASE 3: NVIDIA Hardware present but running Nouveau/NVK
-elif [[ -n "$HAS_NVIDIA" && "$IS_NVIDIA_OPEN" == "false" ]]; then
-    echo -e "${YELLOW}Starting SteamOS session with an NVIDIA GPU using FOSS+NVK Drivers...${NC}"
-    sleep 3
-    exec "$STEAMOS_SESSION_NVIDIA_NVK"
-
-# CASE 4: AMD Radeon
+if [[ -n "$HAS_NVIDIA" ]]; then
+    if [[ "$IS_NVIDIA_MODULE_LOADED" == "true" ]]; then
+        VENDOR="nvidia"
+    else
+        VENDOR="nouveau" # Triggers NVK path in gamemode script
+    fi
 elif [[ -n "$HAS_AMD" ]]; then
-    echo -e "${RED}Starting SteamOS session with an AMD GPU...${NC}"
-    sleep 3
-    exec "$STEAMOS_SESSION_AMD"
-
-# CASE 5: Intel
+    VENDOR="amd"
 elif [[ -n "$HAS_INTEL" ]]; then
-    echo -e "${BLUE}Starting SteamOS session with an Intel GPU...${NC}"
-    sleep 3
-    exec "$STEAMOS_SESSION_INTEL"
-
-# CASE 6: Fallback
+    VENDOR="intel"
 else
-    echo -e "${MAGENTA}Starting SteamOS session with an Generic / Unsupported GPU...${NC}"
-    sleep 3
-    exec "$STEAMOS_SESSION_MESA"
+    VENDOR="generic"
 fi
+
+echo "Detected Vendor: $VENDOR"
+
+# ------------------------------------------------
+# CLEANUP TRAP (The Safety Net)
+# ------------------------------------------------
+# This runs AUTOMATICALLY when this script exits (after the session ends)
+cleanup() {
+    echo "Session ended. Running cleanup..."
+    if [[ -x "$GAMEMODE_SCRIPT" ]]; then
+        bash "$GAMEMODE_SCRIPT" stop "$VENDOR"
+    else
+        echo "Error: Gamemode script not executable during cleanup."
+    fi
+}
+trap cleanup EXIT
+
+# ------------------------------------------------
+# START PERFORMANCE BOOST
+# ------------------------------------------------
+echo "Starting Performance Mode..."
+if [[ -x "$GAMEMODE_SCRIPT" ]]; then
+    bash "$GAMEMODE_SCRIPT" start "$VENDOR"
+else
+    echo "CRITICAL WARNING: Gamemode script not found at $GAMEMODE_SCRIPT"
+fi
+
+# ------------------------------------------------
+# LAUNCH SESSION (BLOCKING)
+# ------------------------------------------------
+# Note: We do NOT use 'exec'. We want this script to stay alive
+# so it can catch the exit signal and run the trap.
+
+if [[ $VGA_COUNT -gt 1 && "$VENDOR" == "nvidia" ]]; then
+    echo "Launching Hybrid Nvidia Session..."
+    bash "$STEAMOS_SESSION_NVIDIA_HYBRID"
+
+elif [[ "$VENDOR" == "nvidia" ]]; then
+    echo "Launching Dedicated Nvidia Session..."
+    bash "$STEAMOS_SESSION_NVIDIA"
+
+elif [[ "$VENDOR" == "nouveau" ]]; then
+    echo "Launching NVK (FOSS) Session..."
+    bash "$STEAMOS_SESSION_NVIDIA_NVK"
+
+elif [[ "$VENDOR" == "amd" ]]; then
+    echo "Launching AMD Session..."
+    bash "$STEAMOS_SESSION_AMD"
+
+elif [[ "$VENDOR" == "intel" ]]; then
+    echo "Launching Intel Session..."
+    bash "$STEAMOS_SESSION_INTEL"
+
+else
+    echo "Launching Fallback Mesa Session..."
+    bash "$STEAMOS_SESSION_MESA"
+fi
+
+# When the session script finishes (user quits Steam),
+# this script hits the end, exits, and triggers the 'trap cleanup' automatically.
