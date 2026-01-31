@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# steamos-gamemode-enhanced v18.8
+# steamos-gamemode-enhanced v21.3
 
-# [Sections 1: Config remains same as v18.7]
+# ------------------------------------------------
+# 1. CONFIGURATION & PRIORITIES
+# ------------------------------------------------
 RT_PRIO_NVIDIA=97
 RT_PRIO_USB=95
-RT_PRIO_PIPEWIRE=93
-RT_PRIO_BT=94
+RT_PRIO_BT=93
+RT_PRIO_PIPEWIRE=91
 SWAPPINESS_TARGET=10
 
-RESTORE_RT_PRIO_NVIDIA=70
-RESTORE_RT_PRIO_USB=50
-RESTORE_RT_PRIO_BT=50
-RESTORE_RT_PRIO_PIPEWIRE=88
+RESTORE_RT_PRIO_IRQ=50
+RESTORE_RT_PRIO_PROC=0
 
 notify() { echo -e "\033[1;33m[GAMEMODE]\033[0m $1"; }
 
@@ -20,22 +20,14 @@ notify() { echo -e "\033[1;33m[GAMEMODE]\033[0m $1"; }
 # ------------------------------------------------
 check_status() {
     echo "================================================================"
-    echo "    STEAMOS GAMEMODE ENHANCED STATUS REPORT"
+    echo "    STEAMOS/ARCH GAMEMODE ENHANCED STATUS REPORT"
     echo "================================================================"
-    local gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
-    local swp=$(cat /proc/sys/vm/swappiness 2>/dev/null)
+    local gov=$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null | head -n 1)
     echo -e "CPU Gov:      ${gov:-N/A}"
-    echo -e "Swappiness:   $swp% (Target: $SWAPPINESS_TARGET%)"
 
-    local scx_proc=$(pgrep -af scx_lavd)
+    local scx_proc=$(pgrep -af scx_lavd | head -n 1)
     if [[ -n "$scx_proc" ]]; then
-        # Try to find 'mode' or 'performance' in the running process string
-        local scx_mode=$(echo "$scx_proc" | grep -oP '(?<=--mode )[^ ]+' || echo "$scx_proc" | grep -oP '(?<=--)[^ ]*performance[^ ]*')
-        if [[ "$scx_mode" == *"gaming"* || "$scx_mode" == *"performance"* ]]; then
-            echo -e "SCX Sched:    ACTIVE (LAVD | Mode: \033[1;32m$scx_mode\033[0m)"
-        else
-            echo -e "SCX Sched:    ACTIVE (LAVD | Mode: \033[1;31m${scx_mode:-default}\033[0m)"
-        fi
+        echo -e "SCX Sched:    \033[1;32mACTIVE\033[0m (LAVD)"
     else
         echo -e "SCX Sched:    \033[1;31mINACTIVE\033[0m"
     fi
@@ -44,133 +36,105 @@ check_status() {
     echo -e "Wi-Fi Power:  ${wifi_ps^^:-UNKNOWN}"
 
     echo "Process Priorities (RT):"
-    ps -eo rtprio,comm | awk -v pw=$RT_PRIO_PIPEWIRE -v rp=$RESTORE_RT_PRIO_PIPEWIRE -v bt=$RT_PRIO_BT \
-    '$2 ~ /bluetoothd|pipewire|steam|gamescope/ {
-        prio_val = ($1 == "-") ? "0" : $1;
-        if (prio_val == pw || prio_val == bt) status = "OPTIMIZED";
-        else if (prio_val == rp) status = "RESTORED";
-        else status = "Std";
-        print "            - " $2 " (Prio: " prio_val ") [" status "]"
+    ps -eo rtprio,comm | awk -v pw=$RT_PRIO_PIPEWIRE -v rk=$RT_PRIO_RAKARRACK -v bt=$RT_PRIO_BT \
+    '$2 ~ /bluetoothd|pipewire|rakarrack|steam|gamescope/ {
+        prio_val = ($1 ~ /-/ || $1 == "") ? "0" : $1;
+        status = (prio_val != "0" && prio_val >= 90) ? "OPTIMIZED" : "Std";
+        printf "            - %-15s (Prio: %s) [%s]\n", $2, prio_val, status
     }' | sort -u
 
     echo "Hardware IRQs (RT):"
-    ps -eo rtprio,psr,comm | grep -Ei "xhci|nvidia" | awk -v n=$RT_PRIO_NVIDIA -v u=$RT_PRIO_USB \
-    '$1 > 0 {
-        status = ($1 == n || $1 == u) ? "OPTIMIZED" : "RESTORED";
-        print "            - " $3 " (Prio: " $1 " | Core: " $2 ") [" status "]"
-    }' | sort -u || echo "            Standard Priority (0)."
+    ps -eo rtprio,psr,comm | grep -E "irq/[0-9]+-(nvidia|xhci)" | awk \
+    '{
+        status = ($1 >= 90) ? "OPTIMIZED" : "RESTORED/Std";
+        printf "            - %-15s (Prio: %s | Core: %s) [%s]\n", $3, $1, $2, status
+    }' | sort -u
     echo "================================================================"
 }
 
 # ------------------------------------------------
-# 3. CORE SUB-ROUTINES (Smart Flag Detection)
+# 3. CORE SUB-ROUTINES
 # ------------------------------------------------
 manage_system_perf() {
     local action=$1; local vendor=$2
     if [[ "$action" == "on" ]]; then
         notify "INIT: Engaging Full Optimization..."
-        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-            echo "performance" | sudo tee "$cpu" >/dev/null 2>&1 || echo "powersave" | sudo tee "$cpu" >/dev/null 2>&1
-        done
-        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
-            [[ -f "$epp" ]] && echo "performance" | sudo tee "$epp" >/dev/null
-        done
+        # CPU Power & EPP
+        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "performance" | sudo tee "$cpu" >/dev/null 2>&1; done
+        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do [[ -f "$epp" ]] && echo "performance" | sudo tee "$epp" >/dev/null; done
         echo "$SWAPPINESS_TARGET" | sudo tee /proc/sys/vm/swappiness > /dev/null
-        pgrep -f "irq/.*-nvidia" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_NVIDIA {}
-        pgrep -f "irq/.*-xhci_hcd" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_USB {}
+
+        # IRQ Tuning
+        pgrep -af "irq/.*nvidia" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RT_PRIO_NVIDIA {}
+        pgrep -af "irq/.*xhci" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RT_PRIO_USB {}
+
+        # Process Tuning
         pgrep -x "pipewire" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_PIPEWIRE {}
 
-        case "$vendor" in
-            nvidia|nvidia-hybrid)
-                command -v nvidia-settings &>/dev/null && nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" > /dev/null 2>&1
-                sudo nvidia-smi -pm 1 > /dev/null 2>&1 ;;
-            amd) echo "high" | sudo tee /sys/class/drm/card*/device/power_dpm_force_performance_level > /dev/null 2>&1 ;;
-            intel) echo "1" | sudo tee /sys/kernel/debug/dri/0/i915_max_freq > /dev/null 2>&1 ;;
-        esac
+        [[ "$vendor" == "nvidia" ]] && { sudo nvidia-smi -pm 1 >/dev/null 2>&1; nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" > /dev/null 2>&1; }
     else
         notify "EXIT: Restoring Defaults..."
         for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
             echo "schedutil" | sudo tee "$cpu" >/dev/null 2>&1 || echo "powersave" | sudo tee "$cpu" >/dev/null 2>&1
         done
-        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
-            [[ -f "$epp" ]] && echo "balance_performance" | sudo tee "$epp" >/dev/null
-        done
+        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do [[ -f "$epp" ]] && echo "balance_performance" | sudo tee "$epp" >/dev/null; done
         echo 60 | sudo tee /proc/sys/vm/swappiness > /dev/null
-        pgrep -f "irq/.*-nvidia" | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_NVIDIA {}
-        pgrep -f "irq/.*-xhci_hcd" | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_USB {}
-        pgrep -x "pipewire" | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_PIPEWIRE {}
+
+        pgrep -af "irq/.*nvidia" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_IRQ {}
+        pgrep -af "irq/.*xhci" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_IRQ {}
+
+        pgrep -x "pipewire" | xargs -r -I {} sudo chrt -o -p 0 {}
     fi
 }
 
 manage_wifi_latency() {
     local interfaces=$(iw dev | awk '$1=="Interface"{print $2}')
     local p_state=$([[ "$1" == "on" ]] && echo "off" || echo "on")
-    for dev in $interfaces; do sudo iw dev "$dev" set power_save "$p_state"; done
+    for dev in $interfaces; do sudo iw dev "$dev" set power_save "$p_state" 2>/dev/null; done
 }
 
 manage_bt_latency() {
     local hci_path="/sys/kernel/debug/bluetooth/hci0"
-    if [[ ! -d "$hci_path" ]]; then return; fi
+    [[ ! -d "$hci_path" ]] && return
     if [[ "$1" == "on" ]]; then
+        # Tighten intervals for gaming/audio controllers
         echo 12 | sudo tee "$hci_path/conn_max_interval" > /dev/null 2>&1
         echo 6 | sudo tee "$hci_path/conn_min_interval" > /dev/null 2>&1
         pgrep -x "bluetoothd" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_BT {}
     else
         echo 40 | sudo tee "$hci_path/conn_max_interval" > /dev/null 2>&1
-        echo 24 | sudo tee "$hci_path/conn_min_interval" > /dev/null 2>&1
-        pgrep -x "bluetoothd" | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_BT {}
+        pgrep -x "bluetoothd" | xargs -r -I {} sudo chrt -o -p 0 {}
     fi
 }
 
 manage_scheduler() {
     if [[ "$1" == "on" ]]; then
-        sudo scxctl stop 2>/dev/null
-        sleep 0.3
-
-        # Check help output to see what flags this version supports
-        local lavd_help=$(/usr/bin/scx_lavd --help 2>&1)
-        local cmd_flags=""
-
-        if [[ "$lavd_help" == *"--mode"* ]]; then
-            cmd_flags="--mode gaming"
-        elif [[ "$lavd_help" == *"--performance"* ]]; then
-            cmd_flags="--performance"
-        else
-            cmd_flags="-p" # Last ditch effort for performance
-        fi
-
-        notify "SCHED: Starting scx_lavd with flags: $cmd_flags"
-        sudo /usr/bin/scxctl start --sched lavd $cmd_flags > /dev/null 2>&1 &
-        sleep 1.2
+        sudo scxctl stop >/dev/null 2>&1
+        sleep 0.5
+        notify "SCHED: Starting LAVD..."
+        sudo scxctl start --sched lavd --mode gaming &
+        sleep 2.0
     else
         notify "SCHED: Stopping custom scheduler..."
-        sudo scxctl stop 2>/dev/null
+        sudo scxctl stop >/dev/null 2>&1
     fi
 }
 
-# [Help & Main same as v18.7]
-show_help() {
-    echo -e "\033[1;32mSTEAMOS GAMEMODE ENHANCED v18.8\033[0m"
-    echo "Usage: sudo $0 -o [on|off] -v [vendor] OR -s"
-    exit 0
-}
-
-if [[ $EUID -ne 0 ]]; then
-   notify "\033[1;31mERROR: This script must be run with sudo!\033[0m"
-   exit 1
-fi
+# ------------------------------------------------
+# 4. MAIN
+# ------------------------------------------------
+[[ $EUID -ne 0 ]] && { notify "ERROR: Run with sudo!"; exit 1; }
 
 while getopts "o:v:sh" opt; do
     case "$opt" in
         o) ACTION=$OPTARG ;;
         v) VENDOR=$OPTARG ;;
         s) check_status ; exit 0 ;;
-        h|*) show_help ;;
+        h|*) echo "Usage: sudo $0 -o [on|off] -v [vendor]"; exit 0 ;;
     esac
 done
 
 if [[ "$ACTION" == "on" ]]; then
-    [[ -z "$VENDOR" ]] && { notify "ERROR: Vendor required"; exit 1; }
     manage_system_perf "on" "$VENDOR"
     manage_wifi_latency "on"
     manage_bt_latency "on"
@@ -182,6 +146,4 @@ elif [[ "$ACTION" == "off" ]]; then
     manage_bt_latency "off"
     manage_scheduler "off"
     notify "EXIT: Restoration Complete."
-else
-    show_help
 fi
