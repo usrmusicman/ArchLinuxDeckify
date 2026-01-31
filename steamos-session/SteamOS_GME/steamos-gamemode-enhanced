@@ -94,7 +94,6 @@ manage_system_perf() {
         pgrep -af "irq/.*nvidia" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RT_PRIO_NVIDIA {}
         pgrep -af "irq/.*xhci" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RT_PRIO_USB {}
         pgrep -x "pipewire" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_PIPEWIRE {}
-        pgrep -f "rakarrack" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_RAKARRACK {}
 
         case "$vendor" in
             nvidia)
@@ -114,7 +113,6 @@ manage_system_perf() {
         pgrep -af "irq/.*nvidia" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_IRQ {}
         pgrep -af "irq/.*xhci" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_IRQ {}
         pgrep -x "pipewire" | xargs -r -I {} sudo chrt -o -p 0 {}
-        pgrep -f "rakarrack" | xargs -r -I {} sudo chrt -o -p 0 {}
         [[ "$vendor" == "nvidia" ]] && nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=0" > /dev/null 2>&1
     fi
 }
