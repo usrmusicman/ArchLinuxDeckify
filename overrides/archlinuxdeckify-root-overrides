@@ -14,8 +14,7 @@
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-settings
 
 # Latency and system tuning 
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/chrt
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/modprobe snd_hrtimer
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/rtirq
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/scxctl
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/tee /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/kwin_wayland
+
+# SteamOS session files
+%wheel ALL=(ALL) NOPASSWD: /home/username/.local/bin/steamos-session/steamos-gamemode-enhanced
