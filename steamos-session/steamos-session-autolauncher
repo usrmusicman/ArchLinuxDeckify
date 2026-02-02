@@ -10,7 +10,6 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 echo "--- New Session Launch: $(date) ---"
 
 # Load Configuration
-export STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
 if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
     source "$STEAMOS_SESSION_CONFIG"
 else
@@ -18,86 +17,34 @@ else
     exit 1
 fi
 
-# Path to Gamemode Script (Ensure this variable is set in your config, or default it here)
-# Using parameter expansion to default if variable is missing
-GAMEMODE_SCRIPT="${STEAMOS_GAMEMODE_ENHANCED:-$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced}"
-
-# ------------------------------------------------
-# HARDWARE DETECTION
-# ------------------------------------------------
-HAS_NVIDIA=$(lspci -n | grep "10de")
-HAS_AMD=$(lspci -n | grep -Ei "1002|1022")
-HAS_INTEL=$(lspci -n | grep "8086")
-
-# Check for Nvidia kernel module (proprietary vs NVK)
-IS_NVIDIA_MODULE_LOADED=false
-if [[ -d /sys/module/nvidia ]]; then
-    IS_NVIDIA_MODULE_LOADED=true
-fi
-
-# Count active VGAs for Hybrid detection
-VGA_COUNT=$(lspci -k | grep -Ei "VGA|3D" -A 2 | grep "Kernel driver in use" | wc -l)
-
-# ------------------------------------------------
-# VENDOR SELECTION
-# ------------------------------------------------
-if [[ -n "$HAS_NVIDIA" ]]; then
-    if [[ "$IS_NVIDIA_MODULE_LOADED" == "true" ]]; then
-        VENDOR="nvidia"
-    else
-        VENDOR="nouveau" # Triggers NVK path in gamemode script
-    fi
-elif [[ -n "$HAS_AMD" ]]; then
-    VENDOR="amd"
-elif [[ -n "$HAS_INTEL" ]]; then
-    VENDOR="intel"
-else
-    VENDOR="generic"
-fi
-
-echo "Detected Vendor: $VENDOR"
-
 # ------------------------------------------------
 # LAUNCH SESSION (BLOCKING)
 # ------------------------------------------------
-# Note: We do NOT use 'exec'. We want this script to stay alive
-# so it can catch the exit signal and run the trap.
 
-# Make sure the desktop doesn't launch
-sudo /usr/bin/systemctl mask getty@tty${DESKTOP_TTY}.service 2>/dev/null
-sudo /usr/bin/systemctl stop getty@tty${DESKTOP_TTY}.service 2>/dev/null
-
-if [[ $VGA_COUNT -gt 1 && "$VENDOR" == "nvidia" ]]; then
-    echo "Launching Hybrid Nvidia Session..."
-    bash "$STEAMOS_SESSION_NVIDIA_HYBRID"
-
-elif [[ "$VENDOR" == "nvidia" ]]; then
-    echo "Launching Dedicated Nvidia Session..."
-    bash "$STEAMOS_SESSION_NVIDIA"
-
-elif [[ "$VENDOR" == "nouveau" ]]; then
-    echo "Launching NVK (FOSS) Session..."
-    bash "$STEAMOS_SESSION_NVIDIA_NVK"
-
-elif [[ "$VENDOR" == "amd" ]]; then
+if [[ "$GPU_SETUP" == "amd" ]]; then
     echo "Launching AMD Session..."
     bash "$STEAMOS_SESSION_AMD"
 
-elif [[ "$VENDOR" == "intel" ]]; then
+elif [[ "$GPU_SETUP" == "intel" ]]; then
     echo "Launching Intel Session..."
     bash "$STEAMOS_SESSION_INTEL"
+
+elif [[ "$GPU_SETUP" == "nvidia" ]]; then
+    echo "Launching Dedicated Nvidia Session..."
+    bash "$STEAMOS_SESSION_NVIDIA"
+
+elif [[ "$GPU_SETUP" == "nvidia_hybrid" ]]; then
+    echo "Launching Hybrid Nvidia Session..."
+    bash "$STEAMOS_SESSION_NVIDIA_HYBRID"
+
+elif [[ "$GPU_SETUP" == "nvidia_nvk" ]]; then
+    echo "Launching NVK (FOSS) Session..."
+    bash "$STEAMOS_SESSION_NVIDIA_NVK"
 
 else
     echo "Launching Fallback Mesa Session..."
     bash "$STEAMOS_SESSION_MESA"
+
 fi
 
-# Cleanup and relaunch the desktop (Silenced)
-sudo /usr/bin/systemctl unmask getty@tty${DESKTOP_TTY}.service 2>/dev/null
-sudo /usr/bin/systemctl restart getty@tty${DESKTOP_TTY}.service 2>/dev/null
-sudo /usr/bin/chvt $DESKTOP_TTY 2>/dev/null
-sudo /usr/bin/systemctl mask getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
-sudo /usr/bin/systemctl stop getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
-
-# When the session script finishes (user quits Steam),
-# this script hits the end, exits, and triggers the 'trap cleanup' automatically.
+# When the session script finishes (user quits Steam)

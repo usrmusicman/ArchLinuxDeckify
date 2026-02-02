@@ -96,7 +96,7 @@ manage_system_perf() {
         pgrep -x "pipewire" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_PIPEWIRE {}
 
         case "$vendor" in
-            nvidia)
+            nvidia | nvidia_hybrid | nvidia_nvk)
                 sudo nvidia-smi -pm 1 >/dev/null 2>&1
                 nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" > /dev/null 2>&1 ;;
             amd)

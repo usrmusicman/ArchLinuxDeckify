@@ -19,6 +19,15 @@ export RENDER_HEIGHT=1440
 export UPSCALE_FILTER="nis"
 export SHARPNESS=2
 
+# GPU Setup values include:
+# amd: AMD dedicated GPU
+# intel: Intel dedicated GPU
+# nvidia: Nvidia dedicated GPU
+# nvidia_hybrid: Nvidia dedicated GPU + Integrated GPU
+# nvidia_nvk: Nvidia dedicated GPU + FOSS Drivers
+# ANY OTHER VALUE USES THE GENERIC mesa drivers
+GPU_SETUP="nvidia"
+
 # GPU POWER LIMIT in Watts
 export GPU_PW_LIMIT=320 # remember to change this number in your /etc/sudoers.d/archlinuxdeckify-root-overrides file to match the value here.
 
@@ -51,7 +60,6 @@ export VKD3D_CONFIG=dxr
 # Path Defintions (Dynamic based on home)
 # ------------------------------------------------
 export STEAMOS_SESSION_PATH="$HOME/.local/bin/steamos-session"
-export STEAMOS_GAMEMODE_ENHANCED="$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced"
 export STEAMOS_SESSION_AMD="$STEAMOS_SESSION_PATH/steamos-session-deck-amd"
 export STEAMOS_SESSION_INTEL="$STEAMOS_SESSION_PATH/steamos-session-deck-intel"
 export STEAMOS_SESSION_MESA="$STEAMOS_SESSION_PATH/steamos-session-deck-mesa"
@@ -74,8 +82,8 @@ export NC='\033[0m'         # Added No Color
 # ------------------------------------------------
 # Misc
 # ------------------------------------------------
-export DESKTOP_TTY="2"
-export STEAMDECKUI_TTY="1"
+export DESKTOP_TTY="1"
+export STEAMDECKUI_TTY="2"
 export STEAM_GAMESCOPE_HAS_HDR=1
 export STEAM_USE_ANY_CONFIG=1
 export XDG_RUNTIME_DIR=/run/user/$(id -u artofmusic)

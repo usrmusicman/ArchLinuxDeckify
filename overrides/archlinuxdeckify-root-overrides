@@ -1,20 +1,6 @@
-# Allow the %wheel group to manage the Steam session and TTYs without a password
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart getty@tty1.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop getty@tty1.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl mask getty@tty1.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl unmask getty@tty1.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart getty@tty2.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop getty@tty2.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl mask getty@tty2.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl unmask getty@tty2.service
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/chvt
-
 # Nvidia specific power limits changesi
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-settings
-
-# Latency and system tuning 
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/kwin_wayland
 
 # SteamOS session files
 %wheel ALL=(ALL) NOPASSWD: /home/username/.local/bin/steamos-session/steamos-gamemode-enhanced

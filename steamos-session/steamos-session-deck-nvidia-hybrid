@@ -42,18 +42,6 @@ export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nvidia_icd.json"
 # Steamdeck Gamescope UI Session
 # ------------------------------------------------
 
-# 1. GPU Power Management
-sudo /usr/bin/nvidia-smi -pm 1 2>/dev/null
-if [[ -n "$GPU_PW_LIMIT" ]]; then
-    sudo /usr/bin/nvidia-smi -pl "$GPU_PW_LIMIT" 2>/dev/null
-else
-    echo "Warning: GPU_PW_LIMIT not set in config."
-fi
-
-# 2. Silencing systemctl and pkill (Added -q and &>/dev/null)
-pkill -9 kwin_wayland 2>/dev/null
-clear
-
 # 3. Run Gamescope with Upscaling Logic
 # -w/-h = Internal Render (What the game thinks it is)
 # -W/-H = Physical Output (The Monitor's resolution)

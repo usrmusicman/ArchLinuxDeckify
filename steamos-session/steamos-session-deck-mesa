@@ -22,10 +22,6 @@ export mesa_glthread=true
 # Steamdeck Gamescope UI Session
 # ------------------------------------------------
 
-# 1. Silencing systemctl and pkill (Added -q and &>/dev/null)
-pkill -9 kwin_wayland 2>/dev/null
-clear
-
 # 2. Run Gamescope with Upscaling Logic
 # -w/-h = Internal Render (What the game thinks it is)
 # -W/-H = Physical Output (The Monitor's resolution)
