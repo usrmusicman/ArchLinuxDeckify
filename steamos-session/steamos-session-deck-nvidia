@@ -62,18 +62,15 @@ export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nvidia_icd.json"
 # Steamdeck Gamescope UI Session
 # ------------------------------------------------
 
-# 1. Silencing GPU setup & power logs (Added &>/dev/null)
+# 1. GPU Power Management
 sudo /usr/bin/nvidia-smi -pm 1 2>/dev/null
-sudo /usr/bin/nvidia-smi -pl $NVIDIA_PW_LIMIT 2>/dev/null # Optional: Lock power limit
-
-# 2. Log power health silently to file
-{
-  echo "--- GPU Power Health Check ---"
-  nvidia-smi --query-gpu=timestamp,power.draw,power.limit,temperature.gpu --format=csv
-} > $HOME/.steamos-session-gpu-check.log
+if [[ -n "$GPU_PW_LIMIT" ]]; then
+    sudo /usr/bin/nvidia-smi -pl "$GPU_PW_LIMIT" 2>/dev/null
+else
+    echo "Warning: GPU_PW_LIMIT not set in config."
+fi
 
 # 3. Silencing systemctl and pkill (Added -q and &>/dev/null)
-sudo /usr/bin/systemctl mask getty@tty${DESKTOP_TTY}.service 2>/dev/null
 pkill -9 kwin_wayland 2>/dev/null
 clear
 
@@ -99,12 +96,3 @@ gamescope \
   --xwayland-count 2 \
   -- \
   steam -steamdeck -steamos3 -gamepadui >/dev/null 2>$HOME/.steamos-session-gamescope.log
-
-# 5. Cleanup (Silenced)
-sudo /usr/bin/systemctl unmask getty@tty${DESKTOP_TTY}.service 2>/dev/null
-sudo /usr/bin/systemctl restart getty@tty${DESKTOP_TTY}.service 2>/dev/null
-sudo /usr/bin/chvt $DESKTOP_TTY &>/dev/null
-
-sudo /usr/bin/systemctl mask getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
-clear
-sudo /usr/bin/systemctl stop getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null

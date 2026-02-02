@@ -58,34 +58,14 @@ fi
 echo "Detected Vendor: $VENDOR"
 
 # ------------------------------------------------
-# CLEANUP TRAP (The Safety Net)
-# ------------------------------------------------
-# This runs AUTOMATICALLY when this script exits (after the session ends)
-cleanup() {
-    echo "Session ended. Running cleanup..."
-    if [[ -x "$GAMEMODE_SCRIPT" ]]; then
-        bash "$GAMEMODE_SCRIPT" stop "$VENDOR"
-    else
-        echo "Error: Gamemode script not executable during cleanup."
-    fi
-}
-trap cleanup EXIT
-
-# ------------------------------------------------
-# START PERFORMANCE BOOST
-# ------------------------------------------------
-echo "Starting Performance Mode..."
-if [[ -x "$GAMEMODE_SCRIPT" ]]; then
-    bash "$GAMEMODE_SCRIPT" start "$VENDOR"
-else
-    echo "CRITICAL WARNING: Gamemode script not found at $GAMEMODE_SCRIPT"
-fi
-
-# ------------------------------------------------
 # LAUNCH SESSION (BLOCKING)
 # ------------------------------------------------
 # Note: We do NOT use 'exec'. We want this script to stay alive
 # so it can catch the exit signal and run the trap.
+
+# Make sure the desktop doesn't launch
+sudo /usr/bin/systemctl mask getty@tty${DESKTOP_TTY}.service 2>/dev/null
+sudo /usr/bin/systemctl stop getty@tty${DESKTOP_TTY}.service 2>/dev/null
 
 if [[ $VGA_COUNT -gt 1 && "$VENDOR" == "nvidia" ]]; then
     echo "Launching Hybrid Nvidia Session..."
@@ -111,6 +91,13 @@ else
     echo "Launching Fallback Mesa Session..."
     bash "$STEAMOS_SESSION_MESA"
 fi
+
+# Cleanup and relaunch the desktop (Silenced)
+sudo /usr/bin/systemctl unmask getty@tty${DESKTOP_TTY}.service 2>/dev/null
+sudo /usr/bin/systemctl restart getty@tty${DESKTOP_TTY}.service 2>/dev/null
+sudo /usr/bin/chvt $DESKTOP_TTY 2>/dev/null
+sudo /usr/bin/systemctl mask getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
+sudo /usr/bin/systemctl stop getty@tty${STEAMDECKUI_TTY}.service 2>/dev/null
 
 # When the session script finishes (user quits Steam),
 # this script hits the end, exits, and triggers the 'trap cleanup' automatically.
