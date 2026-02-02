@@ -1,180 +1,298 @@
 #!/usr/bin/env bash
-# steamos-gamemode-enhanced v21.5
+# steamos-gamemode-enhanced v28.2
+# Static Configuration Mode | Fully Modular | Waterfall Formatting
 
 # ------------------------------------------------
-# 1. CONFIGURATION & PRIORITIES
+# 1. STATIC CONFIGURATION (Edit these manually)
 # ------------------------------------------------
+REAL_USER=${SUDO_USER:-$USER}
+
+# RT Priorities (Gap 5 Standard)
 RT_PRIO_NVIDIA=97
-RT_PRIO_USB=95
-RT_PRIO_BT=93
-RT_PRIO_PIPEWIRE=91
-RT_PRIO_RAKARRACK=93
-SWAPPINESS_TARGET=10
+RT_PRIO_USB=92
+RT_PRIO_PIPEWIRE=87
+RT_PRIO_BT=82
 
-RESTORE_RT_PRIO_IRQ=50
-RESTORE_RT_PRIO_PROC=0
+# Colors
+YLW='\033[1;33m'; GRN='\033[1;32m'; CYN='\033[1;36m'; RED='\033[1;31m'; NC='\033[0m'
 
-notify() { echo -e "\033[1;33m[GAMEMODE]\033[0m $1"; }
+notify() { echo -e "${YLW}[GAMEMODE]${NC} $1"; }
+confirm() { echo -e "           ↳ ${GRN}CHANGE APPLIED:${NC} $1"; }
 
-# ------------------------------------------------
-# 2. HELP MENU
-# ------------------------------------------------
 show_help() {
-    echo -e "\033[1;32mSTEAMOS/ARCH GAMEMODE ENHANCED v21.5\033[0m"
+    echo -e "${CYN}steamos-gamemode-enhanced v28.2${NC}"
+    echo -e "${YLW}The Ultimate Performance Wrapper for Gaming & Professional Multimedia${NC}"
     echo -e "----------------------------------------------------------------"
-    echo -e "USAGE:"
-    echo -e "  sudo $0 -o [on|off] -v [vendor]      Manage performance state"
-    echo -e "  sudo $0 -s                           Display current status report"
+    echo -e "${GRN}USAGE:${NC}"
+    echo -e "  sudo $0 [FLAGS]"
     echo -e ""
-    echo -e "OPTIONS:"
-    echo -e "  -o on         Engage high-performance and pro-audio tweaks"
-    echo -e "  -o off        Restore system to standard/power-saving state"
-    echo -e "  -v nvidia     Apply Nvidia-specific GPU and IRQ optimizations"
-    echo -e "  -v amd        Apply AMD Radeon DPM performance levels"
-    echo -e "  -v intel      Force Intel integrated GPU to max frequency"
+    echo -e "${GRN}CORE FLAGS:${NC}"
+    echo -e "  ${CYN}-p [on|off]${NC}   Global Performance (Governor, WiFi, BT, IRQs)"
+    echo -e "  ${CYN}-v [vendor]${NC}   GPU Tweaks (Options: 'nvidia', 'amd', 'intel')"
+    echo -e "  ${CYN}-d [on|off]${NC}   Toggle scx_loader daemon"
+    echo -e "  ${CYN}-s [name]${NC}     Start SCX Scheduler (Uses 'start' by default)"
+    echo -e "  ${CYN}-m [mode]${NC}     Set SCX Mode (e.g., 'gaming', 'low-latency')"
+    echo -e "  ${CYN}-l${NC}            List SCX schedulers & mode descriptions"
     echo -e ""
-    echo -e "MODULES INCLUDED:"
-    echo -e "  - CPU Gov     Forces 'performance' mode & EPP tweaks"
-    echo -e "  - SCX Sched   Directly starts LAVD (gaming-optimized scheduler)"
-    echo -e "  - IRQ RT      Elevates Nvidia & USB interrupts (97/95)"
-    echo -e "  - Audio RT    Pins Rakarrack & PipeWire to Real-Time (93/91)"
-    echo -e "  - Latency     Disables Wi-Fi Power Save & tightens Bluetooth polling"
+    echo -e "${GRN}AUDIO FLAGS:${NC}"
+    echo -e "  ${CYN}-q [int]${NC}      PipeWire Quantum (Buffer). Recommended: 32, 64, 128"
+    echo -e "  ${CYN}-r [int]${NC}      PipeWire Sample Rate. Recommended: 48000"
+    echo -e ""
+    echo -e "${GRN}STATIC RT TIERS (Hardcoded):${NC}"
+    echo -e "  NVIDIA: $RT_PRIO_NVIDIA | USB: $RT_PRIO_USB | Audio: $RT_PRIO_PIPEWIRE | BT: $RT_PRIO_BT"
+    echo -e ""
+    echo -e "${GRN}RAKARRACK TIPS:${NC}"
+    echo -e "  1. Use ${CYN}-q 64 -r 48000${NC} for stable 1.3ms latency."
+    echo -e "  2. The ${CYN}lavd${NC} scheduler with ${CYN}-m gaming${NC} is best for audio clocks."
+    echo -e "  3. Ensure ${CYN}-p on${NC} is used to engage RT Priority $RT_PRIO_PIPEWIRE."
+    echo -e "----------------------------------------------------------------"
+    exit 0
+}
+
+list_scx_info() {
+    echo -e "${YLW}--- Manually Verified SCX Schedulers ---${NC}"
+    echo -e "  * ${GRN}beerland${NC}   - High-throughput focused for heavy compilation/IO."
+    echo -e "  * ${GRN}bpfland${NC}    - Direct BPF implementation for minimal scheduling overhead."
+    echo -e "  * ${GRN}cosmos${NC}     - High-performance general-purpose scheduling."
+    echo -e "  * ${GRN}flash${NC}      - Ultra-aggressive preemption for bursty workloads."
+    echo -e "  * ${GRN}lavd${NC}       - Latency-critical Auto-Vblank-Driven (Best for Audio)."
+    echo -e "  * ${GRN}p2dq${NC}      - Power-aware Dual Queue for balanced laptop gaming."
+    echo -e "  * ${GRN}tickless${NC}   - Reduced timer interrupts for maximum CPU consistency."
+    echo -e "  * ${GRN}rustland${NC}   - High-safety BPF implementation written in Rust."
+    echo -e "  * ${GRN}rusty${NC}      - Modern, efficient scheduler for multicore interactive desktops."
+
+    echo -e "\n${YLW}--- Supported Mode Profiles ---${NC}"
+    echo -e "  * ${CYN}gaming${NC}      (Optimizes interactive task latency & vblank sync)"
+    echo -e "  * ${CYN}low-latency${NC} (Maximum preemption, best for Real-time Applications)"
+    echo -e "  * ${CYN}powersave${NC}   (Efficiency for mobile/Steam Deck battery)"
+    echo -e "  * ${CYN}balanced${NC}    (Standard desktop responsiveness)"
     echo -e "----------------------------------------------------------------"
     exit 0
 }
 
 # ------------------------------------------------
-# 3. STATUS REPORT
+# 2. MODULAR PERFORMANCE FUNCTIONS
 # ------------------------------------------------
-check_status() {
-    echo "================================================================"
-    echo "    STEAMOS/ARCH GAMEMODE ENHANCED STATUS REPORT"
-    echo "================================================================"
-    local gov=$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null | head -n 1)
-    echo -e "CPU Gov:      ${gov:-N/A}"
 
-    local scx_proc=$(pgrep -af scx_lavd | head -n 1)
-    if [[ -n "$scx_proc" ]]; then
-        echo -e "SCX Sched:    \033[1;32mACTIVE\033[0m (LAVD)"
+manage_thp() {
+    if [[ "$1" == "on" ]]; then
+        # Main Switch
+        echo never | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null 2>&1
+        # Background Defragmentation Switch (Crucial for Audio)
+        echo never | tee /sys/kernel/mm/transparent_hugepage/defrag >/dev/null 2>&1
+        confirm "Transparent Hugepages -> never (Total Lockdown)"
     else
-        echo -e "SCX Sched:    \033[1;31mINACTIVE\033[0m"
-    fi
-
-    local wifi_ps=$(iw dev | grep "power save" | awk '{print $3}' | head -n 1)
-    echo -e "Wi-Fi Power:  ${wifi_ps^^:-UNKNOWN}"
-
-    echo "Process Priorities (RT):"
-    ps -eo rtprio,comm | awk -v pw=$RT_PRIO_PIPEWIRE -v rk=$RT_PRIO_RAKARRACK -v bt=$RT_PRIO_BT \
-    '$2 ~ /bluetoothd|pipewire|steam|gamescope/ {
-        prio_val = ($1 ~ /-/ || $1 == "") ? "0" : $1;
-        status = (prio_val != "0" && prio_val >= 90) ? "OPTIMIZED" : "Std";
-        printf "            - %-15s (Prio: %s) [%s]\n", $2, prio_val, status
-    }' | sort -u
-
-    echo "Hardware IRQs (RT):"
-    ps -eo rtprio,psr,comm | grep -E "irq/[0-9]+-(nvidia|xhci)" | awk \
-    '{
-        status = ($1 >= 90) ? "OPTIMIZED" : "RESTORED/Std";
-        printf "            - %-15s (Prio: %s | Core: %s) [%s]\n", $3, $1, $2, status
-    }' | sort -u
-    echo "================================================================"
-}
-
-# ------------------------------------------------
-# 4. CORE SUB-ROUTINES
-# ------------------------------------------------
-manage_system_perf() {
-    local action=$1; local vendor=$2
-    if [[ "$action" == "on" ]]; then
-        notify "INIT: Engaging Full Optimization..."
-        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "performance" | sudo tee "$cpu" >/dev/null 2>&1; done
-        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do [[ -f "$epp" ]] && echo "performance" | sudo tee "$epp" >/dev/null; done
-        echo "$SWAPPINESS_TARGET" | sudo tee /proc/sys/vm/swappiness > /dev/null
-
-        pgrep -af "irq/.*nvidia" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RT_PRIO_NVIDIA {}
-        pgrep -af "irq/.*xhci" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RT_PRIO_USB {}
-        pgrep -x "pipewire" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_PIPEWIRE {}
-
-        case "$vendor" in
-            nvidia | nvidia_hybrid | nvidia_nvk)
-                sudo nvidia-smi -pm 1 >/dev/null 2>&1
-                nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" > /dev/null 2>&1 ;;
-            amd)
-                echo "high" | sudo tee /sys/class/drm/card*/device/power_dpm_force_performance_level > /dev/null 2>&1 ;;
-            intel)
-                echo "1" | sudo tee /sys/kernel/debug/dri/0/i915_max_freq > /dev/null 2>&1 ;;
-        esac
-    else
-        notify "EXIT: Restoring Defaults..."
-        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "schedutil" | sudo tee "$cpu" >/dev/null 2>&1 || echo "powersave" | sudo tee "$cpu" >/dev/null 2>&1; done
-        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do [[ -f "$epp" ]] && echo "balance_performance" | sudo tee "$epp" >/dev/null; done
-        echo 60 | sudo tee /proc/sys/vm/swappiness > /dev/null
-
-        pgrep -af "irq/.*nvidia" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_IRQ {}
-        pgrep -af "irq/.*xhci" | awk '{print $1}' | xargs -r -I {} sudo chrt -f -p $RESTORE_RT_PRIO_IRQ {}
-        pgrep -x "pipewire" | xargs -r -I {} sudo chrt -o -p 0 {}
-        [[ "$vendor" == "nvidia" ]] && nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=0" > /dev/null 2>&1
+        echo always | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null 2>&1
+        echo always | tee /sys/kernel/mm/transparent_hugepage/defrag >/dev/null 2>&1
+        confirm "Transparent Hugepages -> always (Default)"
     fi
 }
 
-manage_wifi_latency() {
-    local interfaces=$(iw dev | awk '$1=="Interface"{print $2}')
+manage_wifi() {
     local p_state=$([[ "$1" == "on" ]] && echo "off" || echo "on")
-    for dev in $interfaces; do sudo iw dev "$dev" set power_save "$p_state" 2>/dev/null; done
+    for dev in $(iw dev | awk '$1=="Interface"{print $2}'); do
+        iw dev "$dev" set power_save "$p_state" 2>/dev/null
+    done
+    confirm "WiFi Power Save -> $p_state"
 }
 
-manage_bt_latency() {
-    local hci_path="/sys/kernel/debug/bluetooth/hci0"
-    [[ ! -d "$hci_path" ]] && return
+manage_bluetooth() {
+    local hci="/sys/kernel/debug/bluetooth/hci0"
     if [[ "$1" == "on" ]]; then
-        echo 12 | sudo tee "$hci_path/conn_max_interval" > /dev/null 2>&1
-        echo 6 | sudo tee "$hci_path/conn_min_interval" > /dev/null 2>&1
-        pgrep -x "bluetoothd" | xargs -r -I {} sudo chrt -f -p $RT_PRIO_BT {}
+        if [[ -d "$hci" ]]; then
+            echo 12 | tee "$hci/conn_max_interval" >/dev/null 2>&1
+            echo 6 | tee "$hci/conn_min_interval" >/dev/null 2>&1
+        fi
+        pgrep -x "bluetoothd" | xargs -r -I {} chrt -f -p $RT_PRIO_BT {}
+        confirm "Bluetooth Latency -> Fast-Poll | RT Prio: $RT_PRIO_BT"
     else
-        echo 40 | sudo tee "$hci_path/conn_max_interval" > /dev/null 2>&1
-        pgrep -x "bluetoothd" | xargs -r -I {} sudo chrt -o -p 0 {}
+        pgrep -x "bluetoothd" | xargs -r -I {} chrt -o -p 0 {}
+        confirm "Bluetooth Latency -> RESTORED"
     fi
 }
 
-manage_scheduler() {
+manage_cpu() {
     if [[ "$1" == "on" ]]; then
-        sudo scxctl stop >/dev/null 2>&1
-        sleep 0.5
-        notify "SCHED: Starting LAVD..."
-        sudo scxctl start --sched lavd --mode gaming &
-        sleep 2.0
+        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "performance" | tee "$cpu" >/dev/null 2>&1; done
+        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do [[ -f "$epp" ]] && echo "performance" | tee "$epp" >/dev/null; done
+        echo "10" | tee /proc/sys/vm/swappiness > /dev/null
+        confirm "CPU Governor -> performance"
     else
-        notify "SCHED: Stopping custom scheduler..."
-        sudo scxctl stop >/dev/null 2>&1
+        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo "schedutil" | tee "$cpu" >/dev/null 2>&1 || echo "powersave" | tee "$cpu" >/dev/null 2>&1; done
+        echo "60" | tee /proc/sys/vm/swappiness > /dev/null
+        confirm "CPU Governor -> Default"
     fi
 }
 
-# ------------------------------------------------
-# 5. MAIN
-# ------------------------------------------------
-[[ $EUID -ne 0 ]] && { notify "ERROR: Run with sudo!"; exit 1; }
+manage_gpu() {
+    local vendor=$1
+    local action=$2 # We now pass 'on' or 'off' here
 
-while getopts "o:v:sh" opt; do
+    case "$vendor" in
+        nvidia)
+            if [[ "$action" == "on" ]]; then
+                nvidia-smi -pm 1 >/dev/null 2>&1
+                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" >/dev/null 2>&1
+                confirm "GPU (NVIDIA) -> Maximum Performance"
+            else
+                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=0" >/dev/null 2>&1
+                nvidia-smi -pm 0 >/dev/null 2>&1
+                confirm "GPU (NVIDIA) -> Adaptive (Default)"
+            fi
+            ;;
+        amd)
+            local p_level=$([[ "$action" == "on" ]] && echo "high" || echo "auto")
+            local p_mode=$([[ "$action" == "on" ]] && echo "1" || echo "0")
+            for dev in /sys/class/drm/card*/device/; do
+                [[ -f "${dev}power_dpm_force_performance_level" ]] && echo "$p_level" | tee "${dev}power_dpm_force_performance_level" >/dev/null 2>&1
+                [[ -f "${dev}pp_power_profile_mode" ]] && echo "$p_mode" | tee "${dev}pp_power_profile_mode" >/dev/null 2>&1
+            done
+            confirm "GPU (AMD) -> $p_level Profile"
+            ;;
+        intel)
+            for dev in /sys/class/drm/card*/device/gt/gt*/freq0/; do
+                if [[ -d "$dev" ]]; then
+                    if [[ "$action" == "on" ]]; then
+                        max_f=$(cat "${dev}rp0_freq_mhz" 2>/dev/null || cat "${dev}max_freq_mhz" 2>/dev/null)
+                        [[ -n "$max_f" ]] && echo "$max_f" | tee "${dev}min_freq_mhz" >/dev/null 2>&1
+                        confirm "GPU (Intel) -> Locked Max (${max_f}MHz)"
+                    else
+                        min_f=$(cat "${dev}rpn_freq_mhz" 2>/dev/null || echo "300")
+                        echo "$min_f" | tee "${dev}min_freq_mhz" >/dev/null 2>&1
+                        confirm "GPU (Intel) -> Dynamic (Default)"
+                    fi
+                fi
+            done
+            ;;
+    esac
+}
+
+manage_irq_tiers() {
+    if [[ "$1" == "on" ]]; then
+        pgrep -f "xhci" | xargs -r -I {} chrt -f -p $RT_PRIO_USB {}
+        pgrep -f "nvidia" | xargs -r -I {} chrt -f -p $RT_PRIO_NVIDIA {}
+        pgrep -x "pipewire" | xargs -r -I {} chrt -f -p $RT_PRIO_PIPEWIRE {}
+        confirm "RT Tiers -> GPU:$RT_PRIO_NVIDIA USB:$RT_PRIO_USB Audio:$RT_PRIO_PIPEWIRE BT:$RT_PRIO_BT"
+    else
+        pgrep -f "nvidia|xhci" | xargs -r -I {} chrt -o -p 0 {}
+        pgrep -x "pipewire" | xargs -r -I {} chrt -o -p 0 {}
+        confirm "RT Tiers -> RESTORED"
+    fi
+}
+
+verify_status() {
+    echo -e "\n${YLW}--- Verification Summary ---${NC}"
+
+    # CPU Governor
+    local gov=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null)
+    echo -e "  CPU Governor : ${GRN}${gov:-Unknown}${NC}"
+
+    # PipeWire RT Priority
+    local pw_pid=$(pgrep -x "pipewire" | head -n 1)
+    local pw_rt="None"
+    [[ -n "$pw_pid" ]] && pw_rt=$(chrt -p "$pw_pid" | awk -F': ' '/priority/ {print $NF}' | xargs)
+    echo -e "  Audio RT Prio: ${GRN}${pw_rt:-0}${NC} (Target: $RT_PRIO_PIPEWIRE)"
+
+    # THP Status
+    local thp=$(cat /sys/kernel/mm/transparent_hugepage/enabled | awk -F'[][]' '{print $2}')
+    echo -e "  THP Status   : ${GRN}${thp:-Unknown}${NC}"
+
+    # NVIDIA Clock
+    if command -v nvidia-smi &> /dev/null; then
+        local nv_clk=$(nvidia-smi --query-gpu=clocks.gr --format=csv,noheader,nounits 2>/dev/null)
+        [[ -n "$nv_clk" ]] && echo -e "  NVIDIA Clock : ${GRN}${nv_clk} MHz${NC}"
+    fi
+
+    # AMD Clock (sclk = Graphics/Shader Clock)
+    if [[ -d /sys/class/drm/card0/device ]]; then
+        if [[ -f /sys/class/drm/card0/device/hwmon/hwmon*/freq1_input ]]; then
+            # Modern AMD paths (reported in Hz, converted to MHz)
+            local amd_hz=$(cat /sys/class/drm/card0/device/hwmon/hwmon*/freq1_input | head -n 1)
+            echo -e "  AMD Clock    : ${GRN}$((amd_hz / 1000000)) MHz${NC}"
+        elif [[ -f /sys/class/drm/card0/device/pp_dpm_sclk ]]; then
+            # Older AMD paths (shows a list with '*' next to active)
+            local amd_clk=$(cat /sys/class/drm/card0/device/pp_dpm_sclk | grep '*' | awk '{print $2}' | sed 's/Mhz//g')
+            echo -e "  AMD Clock    : ${GRN}${amd_clk:-OFF} MHz${NC}"
+        fi
+    fi
+
+    # Intel Xe / Core Clock
+    if [[ -d /sys/class/drm/card0/device/gt/gt0 ]]; then
+        # Modern Intel Xe paths
+        local intel_clk=$(cat /sys/class/drm/card0/device/gt/gt0/rps_cur_freq_mhz 2>/dev/null)
+        [[ -n "$intel_clk" ]] && echo -e "  Intel Clock  : ${GRN}${intel_clk} MHz${NC}"
+    elif [[ -f /sys/class/drm/card0/gt_cur_freq_mhz ]]; then
+        # Legacy Intel paths
+        local intel_clk=$(cat /sys/class/drm/card0/gt_cur_freq_mhz)
+        echo -e "  Intel Clock  : ${GRN}${intel_clk} MHz${NC}"
+    fi
+
+    echo -e "----------------------------------------------------------------"
+}
+
+# ------------------------------------------------
+# 3. EXECUTION LOGIC
+# ------------------------------------------------
+[[ $EUID -ne 0 ]] && { echo -e "${RED}ERROR: Run with sudo!${NC}"; exit 1; }
+
+while getopts "p:v:d:s:m:q:r:lh" opt; do
     case "$opt" in
-        o) ACTION=$OPTARG ;;
+        p) PERF_ACTION=$OPTARG ;;
         v) VENDOR=$OPTARG ;;
-        s) check_status ; exit 0 ;;
-        h|*) show_help ;;
+        d) SCXCTL_DAEMON=$OPTARG ;;
+        s) SCHED_NAME=$OPTARG ;;
+        m) SCHED_MODE=$OPTARG ;;
+        q) QUANTUM=$OPTARG ;;
+        r) RATE=$OPTARG ;;
+        l) list_scx_info ;;
+        h) show_help ;;
+        *) show_help ;;
     esac
 done
 
-if [[ "$ACTION" == "on" ]]; then
-    manage_system_perf "on" "$VENDOR"
-    manage_wifi_latency "on"
-    manage_bt_latency "on"
-    manage_scheduler "on"
-    notify "SYSTEM: Performance mode ACTIVE."
-elif [[ "$ACTION" == "off" ]]; then
-    manage_system_perf "off" "$VENDOR"
-    manage_wifi_latency "off"
-    manage_bt_latency "off"
-    manage_scheduler "off"
-    notify "EXIT: Restoration Complete."
-else
-    show_help
+[[ -z $@ ]] && show_help
+
+if [[ -n "$PERF_ACTION" ]]; then
+    if [[ "$PERF_ACTION" == "on" ]]; then
+        notify "PERF: Engaging Hardware Optimization..."
+        manage_thp "on"
+        manage_wifi "on"
+        manage_bluetooth "on"
+        manage_cpu "on"
+        # Pass the vendor AND the action "on"
+        [[ -n "$VENDOR" ]] && manage_gpu "$VENDOR" "on"
+        manage_irq_tiers "on"
+        verify_status
+    else
+        notify "PERF: Restoring Hardware Defaults..."
+        manage_thp "off"
+        manage_wifi "off"
+        manage_bluetooth "off"
+        manage_cpu "off"
+        # Pass the vendor AND the action "off"
+        [[ -n "$VENDOR" ]] && manage_gpu "$VENDOR" "off"
+        manage_irq_tiers "off"
+    fi
+fi
+
+if [[ -n "$QUANTUM" || -n "$RATE" ]]; then
+    notify "AUDIO: Updating PipeWire Metadata..."
+    [[ -n "$QUANTUM" ]] && runuser -u "$REAL_USER" -- pw-metadata -n settings 0 clock.force-quantum "$QUANTUM" >/dev/null 2>&1 && confirm "Quantum -> $QUANTUM"
+    [[ -n "$RATE" ]] && runuser -u "$REAL_USER" -- pw-metadata -n settings 0 clock.force-rate "$RATE" >/dev/null 2>&1 && confirm "Sample Rate -> $RATE"
+fi
+
+if [[ -n "$SCHED_NAME" ]]; then
+    notify "SCX: Launching $SCHED_NAME..."
+    scxctl stop >/dev/null 2>&1
+    sleep 0.2
+    CMD="scxctl start --sched $SCHED_NAME"
+    [[ -n "$SCHED_MODE" ]] && CMD="$CMD --mode $SCHED_MODE"
+    $CMD &
+    for i in {1..10}; do
+        if scxctl status 2>/dev/null | grep -qi "Scheduler: $SCHED_NAME"; then
+            confirm "Active Sched -> $SCHED_NAME (${SCHED_MODE:-Default})"
+            break
+        fi
+        sleep 0.4
+    done
 fi
