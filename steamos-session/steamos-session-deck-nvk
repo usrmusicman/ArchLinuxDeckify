@@ -33,6 +33,9 @@ export NOUVEAU_MESA_DEBUG=1
 export NVK_PERFTEST=gpl
 export mesa_glthread=true
 
+# Use the experimental Windows Wine on WOW64 translation to 32bit Windows calls environment. Comment out the get Anti-Cheat titles working.
+export PROTON_USE_WOW64=1
+
 # Standard 64-bit NVK Vulkan ICD path
 export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json"
 

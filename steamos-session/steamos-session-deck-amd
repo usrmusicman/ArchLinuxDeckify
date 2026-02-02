@@ -35,6 +35,9 @@ export RADV_DEBUG=nocompute
 # Enables the persistent disk cache for shaders (Speeds up game launch times)
 export RADV_SHADER_CACHE=1
 
+# Use the experimental Windows Wine on WOW64 translation to 32bit Windows calls environment. Comment out the get Anti-Cheat titles working.
+export PROTON_USE_WOW64=1
+
 # Points specifically to the 64-bit Mesa Radeon Vulkan driver path
 export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
 

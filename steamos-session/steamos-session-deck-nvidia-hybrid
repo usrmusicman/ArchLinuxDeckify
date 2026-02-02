@@ -36,6 +36,14 @@ export WLR_DRM_NO_ATOMIC=1
 # [2026 LATENCY FIX]: Force the iGPU to wait for the dGPU frame completion.
 # This eliminates the "half-frame" tearing common in Optimus setups.
 export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
+
+# [NEW 2026]: Restricts libs to 64-bit to prevent performance regressions on RTX 40-series. Comment out the get Anti-Cheat titles working.
+export PROTON_NVIDIA_LIBS_NO_32BIT=1
+
+# Use the experimental Windows Wine on WOW64 translation to 32bit Windows calls environment. Comment out the get Anti-Cheat titles working.
+export PROTON_USE_WOW64=1
+
+# Points specifically to your NVIDIA Vulkan implementation.
 export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nvidia_icd.json"
 
 # ------------------------------------------------

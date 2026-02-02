@@ -28,6 +28,9 @@ export ANV_ENABLE_FBC=1
 # [INTEL_MEASURE]: Optimization for internal pipeline tracking (Set to 0 for pure speed)
 export INTEL_MEASURE=0
 
+# Use the experimental Windows Wine on WOW64 translation to 32bit Windows calls environment. Comment out the get Anti-Cheat titles working.
+export PROTON_USE_WOW64=1
+
 # Standard 64-bit Intel Vulkan ICD path
 export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
 

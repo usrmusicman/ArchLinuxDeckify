@@ -18,6 +18,9 @@ fi
 # mesa_glthread is safe for almost 99% of Mesa-supported drivers and helps CPU overhead.
 export mesa_glthread=true
 
+# Use the experimental Windows Wine on WOW64 translation to 32bit Windows calls environment. Comment out the get Anti-Cheat titles working.
+export PROTON_USE_WOW64=1
+
 # ------------------------------------------------
 # Steamdeck Gamescope UI Session
 # ------------------------------------------------
