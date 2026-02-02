@@ -65,7 +65,7 @@ check_status() {
 
     echo "Process Priorities (RT):"
     ps -eo rtprio,comm | awk -v pw=$RT_PRIO_PIPEWIRE -v rk=$RT_PRIO_RAKARRACK -v bt=$RT_PRIO_BT \
-    '$2 ~ /bluetoothd|pipewire|rakarrack|steam|gamescope/ {
+    '$2 ~ /bluetoothd|pipewire|steam|gamescope/ {
         prio_val = ($1 ~ /-/ || $1 == "") ? "0" : $1;
         status = (prio_val != "0" && prio_val >= 90) ? "OPTIMIZED" : "Std";
         printf "            - %-15s (Prio: %s) [%s]\n", $2, prio_val, status
