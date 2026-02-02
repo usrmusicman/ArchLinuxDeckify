@@ -27,13 +27,13 @@ source $STEAMOS_SESSION_CONFIG
 
 # Logic for SteamOS gaming mode
 if [[ "$(tty)" == "/dev/tty1" ]]; then
-    startplasma-wayland
     clear
-    sudo $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced -o on -v $GPU_SETUP
+    sudo $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced -d start -s lavd -m gaming -p on -v $GPU_SETUP
     clear
     $STEAMOS_SESSION_PATH/steamos-session-autolauncher
     clear
-    sudo $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced -o off -v $GPU_SETUP
+    sudo $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced -d stop -p off -v $GPU_SETUP
     clear
+    startplasma-wayland
     exit 1
 fi
