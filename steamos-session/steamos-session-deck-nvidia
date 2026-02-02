@@ -52,10 +52,10 @@ export WLR_NO_HARDWARE_CURSORS=1
 export PROTON_ENABLE_NVAPI=1
 export PROTON_HIDE_NVIDIA_GPU=0
 
-# [NEW 2026]: Restricts libs to 64-bit to prevent performance regressions on RTX 40-series. Comment out the get Anti-Cheat titles working.
+# [NEW 2026]: Pure 64-bit environment for RTX 40-series performance.
+# NOTE: If an EAC game (e.g., Halo, Apex) fails with "Unexpected Error",
+# comment these two lines out first.
 export PROTON_NVIDIA_LIBS_NO_32BIT=1
-
-# Use the experimental Windows Wine on WOW64 translation to 32bit Windows calls environment. Comment out the get Anti-Cheat titles working.
 export PROTON_USE_WOW64=1
 
 # Points specifically to your NVIDIA Vulkan implementation.

@@ -18,7 +18,9 @@ fi
 # mesa_glthread is safe for almost 99% of Mesa-supported drivers and helps CPU overhead.
 export mesa_glthread=true
 
-# Use the experimental Windows Wine on WOW64 translation to 32bit Windows calls environment. Comment out the get Anti-Cheat titles working.
+# [NEW 2026]: Pure 64-bit environment.
+# NOTE: If an EAC game (e.g., Halo, Apex) fails with "Unexpected Error",
+# comment these two lines out first.
 export PROTON_USE_WOW64=1
 
 # ------------------------------------------------
