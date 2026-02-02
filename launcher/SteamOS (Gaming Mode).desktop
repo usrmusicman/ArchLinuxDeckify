@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=SteamOS Gaming Mode
-Exec=bash -c `sudo systemctl stop getty@tty2.service && sudo systemctl unmask getty@tty1.service && sudo systemctl restart getty@tty1.service && sudo chvt 1`
-Icon=/home/username/.local/bin/steamos-session/distributor-logo-steamdeck.svg
-Terminal=false
-Categories=Game;
-StartupNotify=true
