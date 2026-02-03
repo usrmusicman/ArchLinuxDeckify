@@ -15,6 +15,13 @@ export STEAMOS_SESSION_PATH="$HOME/.local/bin/steamos-session"
 export STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
 source $STEAMOS_SESSION_CONFIG
 
+# Plasma desktop environment variables
+export XDG_RUNTIME_DIR=/run/user/$(id -u username)
+export XDG_SESSION_TYPE="wayland"
+export XDG_CURRENT_DESKTOP="KDE"
+export KDE_SESSION_VERSION=6
+export QT_QPA_PLATFORM="wayland;xcb"
+
 #### EXPERIMENTAL ###
 
 # rusticl specific
