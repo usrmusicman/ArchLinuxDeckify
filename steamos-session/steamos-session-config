@@ -65,7 +65,7 @@ export STEAMOS_SESSION_INTEL="$STEAMOS_SESSION_PATH/steamos-session-deck-intel"
 export STEAMOS_SESSION_MESA="$STEAMOS_SESSION_PATH/steamos-session-deck-mesa"
 export STEAMOS_SESSION_NVIDIA="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia"
 export STEAMOS_SESSION_NVIDIA_HYBRID="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia-hybrid"
-export STEAMOS_SESSION_NVIDIA_NVK="$STEAMOS_SESSION_PATH/steamos-session-deck-nvk"
+export STEAMOS_SESSION_NVIDIA_NVK="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia-nvk"
 
 # ------------------------------------------------
 # Font Text Colors
