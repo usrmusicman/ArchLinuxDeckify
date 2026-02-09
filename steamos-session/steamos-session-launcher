@@ -54,6 +54,11 @@ fi
 # NOTE: If EAC (Easy Anti-Cheat) titles fail, comment this out.
 export PROTON_USE_WOW64=1
 
+# SESSION TYPE SETTINGS
+export XDG_SESSION_TYPE=wayland
+export SDL_VIDEODRIVER=wayland
+export XDG_CURRENT_DESKTOP=gamescope
+
 # ------------------------------------------------------------------------------
 # 2. HARDWARE MODULES
 # ------------------------------------------------------------------------------
