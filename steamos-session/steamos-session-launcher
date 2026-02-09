@@ -43,11 +43,11 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# Hardware detection source
-if [ -z "$SYSTEM_GPU" ]; then
-  # Load the external config that defines the user's current hardware environment
-  source "$STEAMOS_SESSION_CONFIG"
-fi
+# SteamOS session config file
+STEAMOS_SESSION_CONFIG="/home/$USER/.config/steamos-session/steamos-session-config"
+
+# Load the external config that defines the user's current hardware environment
+source "$STEAMOS_SESSION_CONFIG"
 
 # [GLOBAL]: Pure 64-bit environment for 2026 performance.
 # This eliminates 32-bit thunking overhead for modern titles.
