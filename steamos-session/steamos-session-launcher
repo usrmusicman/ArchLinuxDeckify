@@ -86,6 +86,8 @@ module_amd() {
   export RADV_SHADER_CACHE=1
 
   export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
+
+  echo "Now Using AMD GPU Optimizations..."
 }
 
 # --- INTEL ARC/XE MODULE ---
@@ -104,6 +106,8 @@ module_intel() {
   export INTEL_MEASURE=0
 
   export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
+
+  echo "Now Using Intel GPU Optimizations..."
 }
 
 # --- NVIDIA CORE ENGINE (Shared between Proprietary and Hybrid) ---
@@ -143,6 +147,8 @@ module_nvidia_proprietary_extras() {
 
   # Fixes cursor disappearing or glitching in the Gamescope compositor.
   export WLR_NO_HARDWARE_CURSORS=1
+
+  echo "Now Using Nvidia GPU Optimizations..."
 }
 
 # --- NVIDIA LAPTOP/HYBRID EXTRAS ---
@@ -156,6 +162,8 @@ module_nvidia_hybrid_extras() {
 
   # [2026 LATENCY FIX]: Syncs the iGPU and dGPU frames to prevent "half-frame" tearing.
   export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
+
+  echo "Now Using Nvidia Hybrid GPU Optimizations..."
 }
 
 # --- NVIDIA NVK (Open Source/Mesa) MODULE ---
@@ -177,12 +185,15 @@ module_nvidia_nvk() {
   export mesa_glthread=true
 
   export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json"
+
+  echo "Now Using Nvidia GPU with nouveau Optimizations..."
 }
 
 # --- GENERIC MESA MODULE ---
 module_mesa_generic() {
   # Safe for 99% of Mesa drivers; offloads draw calls to a separate CPU thread.
   export mesa_glthread=true
+  echo "Now Using Generic GPU Optimizations..."
 }
 
 # ------------------------------------------------------------------------------
@@ -192,27 +203,33 @@ module_mesa_generic() {
 case "$GPU_SETUP" in
   "amd")
     module_amd
+    #sleep 3
     ;;
   "intel")
     module_intel
+    #sleep 3
     ;;
   "nvidia")
     # Proprietary Desktop Case
     module_nvidia_core
     module_nvidia_proprietary_extras
+    #sleep 3
     ;;
   "nvidia_hybrid")
     # Proprietary Laptop/Optimus Case (Shares Core)
     module_nvidia_core
     module_nvidia_hybrid_extras
+    #sleep 3
     ;;
   "nvidia_nvk")
     # Open Source Case
     module_nvidia_nvk
+    #sleep 3
     ;;
   *)
     # Fallback for LLVMpipe or unknown hardware
     module_mesa_generic
+    #sleep 3
     ;;
 esac
 
