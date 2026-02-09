@@ -2,7 +2,7 @@
 # NO execution, NO sourcing of launchers
 
 # ------------------------------------------------
-# MONITOR & UPSCALING & POWER SETTINGS
+# MONITOR & UPSCALING & POWER & RTIRQ PRIO & PIPEWIRE AUDIO SESSION SETTINGS
 # ------------------------------------------------
 
 # Target Monitor (Output)
@@ -14,10 +14,6 @@ export REFRESHRATE=360
 # Example: Set to 1920x1080 to upscale to 1440p
 export RENDER_WIDTH=2560
 export RENDER_HEIGHT=1440
-
-# Upscaling Method: 'fsr', 'nis', or 'linear'
-export UPSCALE_FILTER="nis"
-export SHARPNESS=2
 
 # GPU Setup values include:
 # amd: AMD dedicated GPU
@@ -31,14 +27,22 @@ GPU_SETUP="nvidia"
 # GPU POWER LIMIT in Watts
 export GPU_PW_LIMIT=320 # remember to change this number in your /etc/sudoers.d/archlinuxdeckify-root-overrides file to match the value here.
 
+# Set IRQ threads up to a value 97 is acceptable
+export RT_PRIO_USB=97
+export RT_PRIO_PIPEWIRE=92
+export RT_PRIO_BT=87
+
+# Set audio session buffer and samplerate settings
+export DEFAULT_QUANTUM=64
+export DEFAULT_RATE=48000
+
 # ------------------------------------------------
 # Common Proton / Gamescope / Steam defaults
 # ------------------------------------------------
 
-# SESSION TYPE SETTINGS
-export XDG_SESSION_TYPE=wayland
-export SDL_VIDEODRIVER=wayland
-export XDG_CURRENT_DESKTOP=gamescope
+# Upscaling Method: 'fsr', 'nis', or 'linear'
+export UPSCALE_FILTER="nis"
+export SHARPNESS=2
 
 # Wayland + Gamescope
 export PROTON_ENABLE_WAYLAND=1
@@ -55,17 +59,6 @@ export MESA_VK_WSI_PRESENT_MODE=mailbox
 
 # DX12
 export VKD3D_CONFIG=dxr
-
-# ------------------------------------------------
-# Path Defintions (Dynamic based on home)
-# ------------------------------------------------
-export STEAMOS_SESSION_PATH="$HOME/.local/bin/steamos-session"
-export STEAMOS_SESSION_AMD="$STEAMOS_SESSION_PATH/steamos-session-deck-amd"
-export STEAMOS_SESSION_INTEL="$STEAMOS_SESSION_PATH/steamos-session-deck-intel"
-export STEAMOS_SESSION_MESA="$STEAMOS_SESSION_PATH/steamos-session-deck-mesa"
-export STEAMOS_SESSION_NVIDIA="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia"
-export STEAMOS_SESSION_NVIDIA_HYBRID="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia-hybrid"
-export STEAMOS_SESSION_NVIDIA_NVK="$STEAMOS_SESSION_PATH/steamos-session-deck-nvidia-nvk"
 
 # ------------------------------------------------
 # Font Text Colors

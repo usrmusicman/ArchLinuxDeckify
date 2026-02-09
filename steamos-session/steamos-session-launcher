@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+
+# ==============================================================================
+# UNIFIED STEAMOS SESSION SCRIPT (2026 HIGH-PERFORMANCE EDITION)
+# ==============================================================================
+# This script manages GPU-specific environment variables, compositor settings,
+# and session launching. It uses a modular architecture to share core logic
+# between driver variations (e.g., NVIDIA Proprietary vs. NVIDIA Hybrid).
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. INITIALIZATION & ARGUMENT PARSING
+# ------------------------------------------------------------------------------
+
+# Default values if no flags are passed
+ENABLE_HDR=false
+TARGET_CMD="steam -gamepadui -steamos3 -steamos -steamdeck"
+
+# CLI Switch Logic
+# Usage: ./session.sh --hdr --run <command> <args>
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --hdr)
+            # High Dynamic Range toggle for Gamescope
+            ENABLE_HDR=true
+            shift
+            ;;
+        --run)
+            # Shift past the --run flag
+            shift
+            # Capture every remaining argument as a single command string.
+            # This allows for infinitely long commands with complex parameters.
+            if [[ -n "$*" ]]; then
+                TARGET_CMD="$*"
+            fi
+            # Break ensures we don't try to parse game-specific flags as script flags
+            break
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# Hardware detection source
+if [ -z "$SYSTEM_GPU" ]; then
+  # Load the external config that defines the user's current hardware environment
+  source "$STEAMOS_SESSION_CONFIG"
+fi
+
+# [GLOBAL]: Pure 64-bit environment for 2026 performance.
+# This eliminates 32-bit thunking overhead for modern titles.
+# NOTE: If EAC (Easy Anti-Cheat) titles fail, comment this out.
+export PROTON_USE_WOW64=1
+
+# ------------------------------------------------------------------------------
+# 2. HARDWARE MODULES
+# ------------------------------------------------------------------------------
+
+# --- AMD RADEON MODULE ---
+module_amd() {
+  # RADV is the community-standard driver, vastly superior to AMDVLK for gaming.
+  export AMD_VULKAN_ICD=RADV
+
+  # [GPL]: Graphics Pipeline Library - Eliminates shader compilation stutter.
+  # [NGGC]: Next-Gen Geometry Culling - Hardware-level speedup for RDNA 2/3/4.
+  # [SAM]: Smart Access Memory - Direct CPU access to GPU VRAM.
+  export RADV_PERFTEST=gpl,nggc,sam
+
+  # Forces 1x1 shading (Full Quality). Prevents dynamic resolution downscaling.
+  export RADV_FORCE_VRS=1
+
+  # Driver-level Anisotropic Filtering (16x) for sharper textures at a distance.
+  export RADV_TEX_ANISO=16
+
+  # [nocompute]: Simplifies the GPU queue to ensure consistent frame pacing.
+  export RADV_DEBUG=nocompute
+
+  # Persistent disk cache for shaders to reduce load times.
+  export RADV_SHADER_CACHE=1
+
+  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
+}
+
+# --- INTEL ARC/XE MODULE ---
+module_intel() {
+  # [nothrottle]: Disables frequency dips to keep clocks at maximum gaming speed.
+  # [rebind]: Optimizes memory management specifically for Intel's tile architecture.
+  export INTEL_DEBUG=nothrottle,rebind
+
+  # Multi-threaded command submission for Mesa-based Intel drivers.
+  export mesa_glthread=true
+
+  # Frame Buffer Compression: Saves memory bandwidth on integrated/mobile chips.
+  export ANV_ENABLE_FBC=1
+
+  # Disables internal measurement overhead for pure execution speed.
+  export INTEL_MEASURE=0
+
+  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
+}
+
+# --- NVIDIA CORE ENGINE (Shared between Proprietary and Hybrid) ---
+module_nvidia_core() {
+  # [__GL_MaxFramesAllowed]: Limits pre-render queue. Essential for "instant" input feel.
+  export __GL_MaxFramesAllowed=1
+
+  # Persistent shader cache path to prevent re-compiling every session.
+  export __GL_SHADER_DISK_CACHE=1
+  export __GL_SHADER_DISK_CACHE_PATH="$HOME/.cache/nvidia"
+
+  # Mandatory: Ensures XWayland/Applications use the NVIDIA proprietary stack.
+  export __GLX_VENDOR_LIBRARY_NAME=nvidia
+  export GBM_BACKEND=nvidia-drm
+
+  # Bridges Windows game calls to NVIDIA specific tech (DLSS, Reflex, NVAPI).
+  export PROTON_ENABLE_NVAPI=1
+  export PROTON_HIDE_NVIDIA_GPU=0
+
+  # Pure 64-bit library pathing for 2026 hardware performance.
+  export PROTON_NVIDIA_LIBS_NO_32BIT=1
+
+  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nvidia_icd.json"
+}
+
+# --- NVIDIA DESKTOP/PROPRIETARY EXTRAS ---
+module_nvidia_proprietary_extras() {
+  # Enables G-Sync/VRR support within the Gamescope/Wayland environment.
+  export __GL_GSYNC_ALLOWED=1
+  export __GL_VRR_ALLOWED=1
+
+  # [USLEEP]: Safer than "NOTHING". Prevents CPU starvation at very high refresh rates.
+  export __GL_YIELD="USLEEP"
+
+  # Accelerates data transfer between CPU and GPU memory.
+  export __GL_WRITE_COMBINED_MEMORY=1
+
+  # Fixes cursor disappearing or glitching in the Gamescope compositor.
+  export WLR_NO_HARDWARE_CURSORS=1
+}
+
+# --- NVIDIA LAPTOP/HYBRID EXTRAS ---
+module_nvidia_hybrid_extras() {
+  # Prime Offload: Forces the heavy rendering onto the NVIDIA dGPU.
+  export __NV_PRIME_RENDER_OFFLOAD=1
+  export __VK_LAYER_NV_optimus=NVIDIA_only
+
+  # Disables atomic check to prevent screen "flip" errors on specific laptop panels.
+  export WLR_DRM_NO_ATOMIC=1
+
+  # [2026 LATENCY FIX]: Syncs the iGPU and dGPU frames to prevent "half-frame" tearing.
+  export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
+}
+
+# --- NVIDIA NVK (Open Source/Mesa) MODULE ---
+module_nvidia_nvk() {
+  # Clear proprietary variables to prevent driver pathing conflicts.
+  unset __GLX_VENDOR_LIBRARY_NAME
+  unset PROTON_ENABLE_NVAPI
+  unset PROTON_HIDE_NVIDIA_GPU
+
+  # Forces the use of the Nouveau/NVK open-source Vulkan driver.
+  export MESA_LOADER_DRIVER_OVERRIDE=nouveau
+
+  # [sync]: Ensures frame pacing is handled correctly by the NVK kernel module.
+  export NVK_DEBUG=sync
+  export NOUVEAU_MESA_DEBUG=1
+
+  # GPL support is experimental but essential to avoid NVK shader stutter.
+  export NVK_PERFTEST=gpl
+  export mesa_glthread=true
+
+  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json"
+}
+
+# --- GENERIC MESA MODULE ---
+module_mesa_generic() {
+  # Safe for 99% of Mesa drivers; offloads draw calls to a separate CPU thread.
+  export mesa_glthread=true
+}
+
+# ------------------------------------------------------------------------------
+# 3. EXECUTION LOGIC (SYSTEM GPU SWITCH)
+# ------------------------------------------------------------------------------
+
+case "$GPU_SETUP" in
+  "amd")
+    module_amd
+    ;;
+  "intel")
+    module_intel
+    ;;
+  "nvidia")
+    # Proprietary Desktop Case
+    module_nvidia_core
+    module_nvidia_proprietary_extras
+    ;;
+  "nvidia_hybrid")
+    # Proprietary Laptop/Optimus Case (Shares Core)
+    module_nvidia_core
+    module_nvidia_hybrid_extras
+    ;;
+  "nvidia_nvk")
+    # Open Source Case
+    module_nvidia_nvk
+    ;;
+  *)
+    # Fallback for LLVMpipe or unknown hardware
+    module_mesa_generic
+    ;;
+esac
+
+# ------------------------------------------------------------------------------
+# 4. GAMESCOPE COMPOSITOR SETUP
+# ------------------------------------------------------------------------------
+
+# Using an array to handle arguments cleanly without quoting issues.
+GS_ARGS=(
+  "-w" "$RENDER_WIDTH"      # Virtual width game sees
+  "-h" "$RENDER_HEIGHT"     # Virtual height game sees
+  "-W" "$SCREENWIDTH"       # Actual physical width
+  "-H" "$SCREENHEIGHT"      # Actual physical height
+  "-r" "$REFRESHRATE"       # Monitor Hz
+  "-f"                      # Fullscreen
+  "--adaptive-sync"         # VRR/G-Sync/FreeSync
+  "--immediate-flips"       # Lowest possible latency (Tearing allowed if out of VRR)
+  "--force-grab-cursor"     # Prevent mouse escaping the game window
+  "-S" "fit"                # Scaling mode
+  "-F" "$UPSCALE_FILTER"    # fsr, nis, or linear
+  "--sharpness" "$SHARPNESS"
+  "--mangoapp"              # Performance overlay support
+  "--steam"                 # Integration with Steam UI
+  "--xwayland-count" "2"    # Extra instance for overlay stability
+)
+
+# Apply HDR if the --hdr switch was used
+if [ "$ENABLE_HDR" = true ]; then
+  # Enables 10-bit/HDR metadata pass-through to the display
+  GS_ARGS+=("--hdr-enabled")
+fi
+
+# ------------------------------------------------------------------------------
+# 5. FINAL LAUNCH
+# ------------------------------------------------------------------------------
+
+# Execute the compositor and the target application (Default Steam or User Choice)
+# 'exec' replaces the shell process with gamescope for better signal handling.
+exec gamescope "${GS_ARGS[@]}" -- $TARGET_CMD
