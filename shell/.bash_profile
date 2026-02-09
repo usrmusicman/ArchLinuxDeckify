@@ -11,21 +11,13 @@
 # ------------------------------------------------
 
 # SteamOS Gaming Session
-export STEAMOS_SESSION_PATH="$HOME/.local/bin/steamos-session"
-export STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
-source $STEAMOS_SESSION_CONFIG
-
-# Plasma desktop environment variables
-export XDG_RUNTIME_DIR=/run/user/$(id -u username)
-export XDG_SESSION_TYPE="wayland"
-export XDG_CURRENT_DESKTOP="KDE"
-export KDE_SESSION_VERSION=6
-export QT_QPA_PLATFORM="wayland;xcb"
+export STEAMOS_GAMEMODE="/home/$USER/.local/bin/steamos-session/steamos-gamemode-enhanced"
+export STEAMOS_SESSION_LAUNCHER="/home/$USER/.local/bin/steamos-session/steamos-session-launcher"
 
 #### EXPERIMENTAL ###
 
 # rusticl specific
-#export RUSTICL_ENABLE=nvk  # Or 'iris' for Intel / 'radeonsi' for AMD
+#export RUSTICL_ENABLE=  # 'iris' for Intel / 'radeonsi' for AMD / "nvk" for Nvidia using nvk+nouveau 
 #export OCL_ICD_VENDORS=rusticl.icd
 
 # ------------------------------------------------
@@ -35,11 +27,12 @@ export QT_QPA_PLATFORM="wayland;xcb"
 # Logic for SteamOS gaming mode
 if [[ "$(tty)" == "/dev/tty1" ]]; then
     clear
-    sudo $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced -d start -s lavd -m gaming -p on -v $GPU_SETUP
+    sudo $STEAMOS_GAMEMODE -s lavd -m gaming
+    sleep 3
     clear
-    $STEAMOS_SESSION_PATH/steamos-session-autolauncher
+    $STEAMOS_SESSION_LAUNCHER --hdr --run steam -gamepadui -steamos3 -steamos -steamdeck 2>/dev/null
     clear
-    sudo $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced -d stop -p off -v $GPU_SETUP
+    sudo $STEAMOS_GAMEMODE -x
     clear
     startplasma-wayland
     exit 1
