@@ -87,7 +87,7 @@ module_amd() {
 
   export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
 
-  echo "Now Using AMD GPU Optimizations..."
+  echo -e "${RED}Now Using AMD GPU Optimizations...${NC}"
 }
 
 # --- INTEL ARC/XE MODULE ---
@@ -107,7 +107,7 @@ module_intel() {
 
   export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
 
-  echo "Now Using Intel GPU Optimizations..."
+  echo -e "${BLUE}Now Using Intel GPU Optimizations...${NC}"
 }
 
 # --- NVIDIA CORE ENGINE (Shared between Proprietary and Hybrid) ---
@@ -148,7 +148,7 @@ module_nvidia_proprietary_extras() {
   # Fixes cursor disappearing or glitching in the Gamescope compositor.
   export WLR_NO_HARDWARE_CURSORS=1
 
-  echo "Now Using Nvidia GPU Optimizations..."
+  echo -e "${GREEN}Now Using Nvidia GPU Optimizations...${NC}"
 }
 
 # --- NVIDIA LAPTOP/HYBRID EXTRAS ---
@@ -163,7 +163,7 @@ module_nvidia_hybrid_extras() {
   # [2026 LATENCY FIX]: Syncs the iGPU and dGPU frames to prevent "half-frame" tearing.
   export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
 
-  echo "Now Using Nvidia Hybrid GPU Optimizations..."
+  echo -e "${TEAL}Now Using Nvidia Hybrid GPU Optimizations...${NC}"
 }
 
 # --- NVIDIA NVK (Open Source/Mesa) MODULE ---
@@ -186,14 +186,14 @@ module_nvidia_nvk() {
 
   export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json"
 
-  echo "Now Using Nvidia GPU with nouveau Optimizations..."
+  echo -e "${YELLOW}Now Using Nvidia GPU with nouveau Optimizations...${NC}"
 }
 
 # --- GENERIC MESA MODULE ---
 module_mesa_generic() {
   # Safe for 99% of Mesa drivers; offloads draw calls to a separate CPU thread.
   export mesa_glthread=true
-  echo "Now Using Generic GPU Optimizations..."
+  echo -e "${MAGENTA}Now Using Generic GPU Optimizations...${NC}"
 }
 
 # ------------------------------------------------------------------------------
