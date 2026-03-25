@@ -28,12 +28,12 @@ GPU_SETUP="nvidia"
 export GPU_PW_LIMIT=320 # remember to change this number in your /etc/sudoers.d/archlinuxdeckify-root-overrides file to match the value here.
 
 # Set IRQ threads up to a value 97 is acceptable
-export RT_PRIO_USB=97
-export RT_PRIO_PIPEWIRE=92
-export RT_PRIO_BT=87
+export RT_PRIO_USB=90
+export RT_PRIO_PIPEWIRE=80
+export RT_PRIO_BT=85
 
 # Set audio session buffer and samplerate settings
-export DEFAULT_QUANTUM=64
+export DEFAULT_QUANTUM=256
 export DEFAULT_RATE=48000
 
 # ------------------------------------------------
