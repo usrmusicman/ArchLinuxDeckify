@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+# Define paths
+GETTY_OVERRIDE_DIR="/etc/systemd/system/getty@tty1.service.d"
+GETTY_OVERRIDE_FILE="$GETTY_OVERRIDE_DIR/override.conf"
+SUDOERS_FILE="/etc/sudoers.d/steamos-session-overrides"
+
+# Check for root privileges
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root (sudo)."
+   exit 1
+fi
+
+# 1. Configure Getty Autologin
+mkdir -p "$GETTY_OVERRIDE_DIR"
+REAL_USER=${SUDO_USER:-$USER}
+
+cat <<EOF > "$GETTY_OVERRIDE_FILE"
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $REAL_USER --noclear %I 38400 linux
+EOF
+
+echo "Getty override created for user: $REAL_USER"
+
+# 2. Configure Sudoers Overrides
+# This allows the performance and power scripts to run without password prompts
+cat <<EOF > "$SUDOERS_FILE"
+# Nvidia specific power limits changes
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-settings
+
+# SteamOS Enhanced Gamemode
+%wheel ALL=(ALL) NOPASSWD: /opt/steamos-ssession/steamos-gamemode-enhanced
+EOF
+
+# Set correct permissions for sudoers file
+chmod 440 "$SUDOERS_FILE"
+echo "Sudoers overrides written to $SUDOERS_FILE"
+
+# 3. Enable Service
+systemctl daemon-reload
+systemctl enable getty@tty1.service
+
+echo "Configuration complete. Getty autologin and sudoers permissions are active."

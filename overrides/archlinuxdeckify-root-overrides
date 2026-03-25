@@ -1,6 +1,0 @@
-# Nvidia specific power limits changesi
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-smi
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-settings
-
-# SteamOS session files
-%wheel ALL=(ALL) NOPASSWD: /home/username/.local/bin/steamos-session/steamos-gamemode-enhanced

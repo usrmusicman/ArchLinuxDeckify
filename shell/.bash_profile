@@ -11,8 +11,8 @@
 # ------------------------------------------------
 
 # SteamOS Gaming Session
-export STEAMOS_GAMEMODE="/home/$USER/.local/bin/steamos-session/steamos-gamemode-enhanced"
-export STEAMOS_SESSION_LAUNCHER="/home/$USER/.local/bin/steamos-session/steamos-session-launcher"
+export STEAMOS_GAMEMODE="/opt/steamos-session/steamos-gamemode-enhanced"
+export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session/steamos-session-launcher"
 
 #### EXPERIMENTAL ###
 
