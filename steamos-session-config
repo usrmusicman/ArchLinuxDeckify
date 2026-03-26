@@ -31,6 +31,7 @@ export GPU_PW_LIMIT=320 # remember to change this number in your /etc/sudoers.d/
 export RT_PRIO_USB=90
 export RT_PRIO_PIPEWIRE=80
 export RT_PRIO_BT=85
+export RT_PRIO_SOUND=70
 
 # Set audio session buffer and samplerate settings
 export DEFAULT_QUANTUM=256

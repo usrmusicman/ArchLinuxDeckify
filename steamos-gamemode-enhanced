@@ -25,19 +25,63 @@ if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
     source "$STEAMOS_SESSION_CONFIG"
 else
     echo -e "${YLW}WARNING: Session config not found, using built-in defaults${NC}"
-    echo -e "${YLW}Using default GPU_SETUP=$GPU_SETUP, RT_PRIO_USB=$RT_PRIO_USB, RT_PRIO_PIPEWIRE=$RT_PRIO_PIPEWIRE, RT_PRIO_BT=$RT_PRIO_BT, DEFAULT_QUANTUM=$DEFAULT_QUANTUM, DEFAULT_RATE=$DEFAULT_RATE${NC}"
 fi
 
 # --------------------------
 # DEFAULTS (if not defined in config)
 # --------------------------
-GPU_SETUP=${GPU_SETUP:-nvidia}   # explicit, no auto-detect
+GPU_SETUP=${GPU_SETUP:-generic}
 RT_PRIO_USB=${RT_PRIO_USB:-90}
 RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-80}
 RT_PRIO_BT=${RT_PRIO_BT:-85}
+RT_PRIO_SOUND=${RT_PRIO_SOUND:-70}
 
+# Pipewire Settings
 DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-256}
 DEFAULT_RATE=${DEFAULT_RATE:-48000}
+
+# --------------------------
+# SYSTEM STATUS MODULE (-i)
+# --------------------------
+display_status() {
+    notify "Gathering Current System & Audio Status..."
+    local user_uid=$(id -u "$REAL_USER")
+
+    echo -e "\n${YLW}=== AUDIO ENVIRONMENT ===${NC}"
+    echo -e "${GRN}Active User:${NC} $REAL_USER (UID: $user_uid)"
+
+    # Improved metadata extraction logic
+    local pw_settings=$(runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 2>/dev/null)
+
+    # We use sed to grab only the digits/values following the key names
+    local cur_quantum=$(echo "$pw_settings" | grep "clock.force-quantum" | sed -E 's/.*value:[[:space:]]*([^[:space:]]*).*/\1/' | tr -d "'")
+    local cur_rate=$(echo "$pw_settings" | grep "clock.force-rate" | sed -E 's/.*value:[[:space:]]*([^[:space:]]*).*/\1/' | tr -d "'")
+
+    # Check if values are 0 or empty (PipeWire's way of saying "Auto/Dynamic")
+    [[ "$cur_quantum" == "0" || -z "$cur_quantum" ]] && cur_quantum="Dynamic (Auto)"
+    [[ "$cur_rate" == "0" || -z "$cur_rate" ]] && cur_rate="Dynamic (Auto)"
+
+    echo -e "  * Sample Rate : ${CYN}${cur_rate}${NC}"
+    echo -e "  * Quantum Buf : ${CYN}${cur_quantum}${NC}"
+
+    echo -e "\n${YLW}=== THREADED IRQs (Interrupt Requests) ===${NC}"
+    echo -e "Displaying top hardware interrupts and audio threads sorted by RT Priority:"
+    echo -e "------------------------------------------------------------"
+    printf "  %-10s | %-10s | %-30s\n" "PID" "RT PRIO" "COMMAND"
+    echo -e "------------------------------------------------------------"
+
+    # Sorting by Priority (Column 2)
+    ps -eo pid,rtprio,comm | grep -iE "^ *[0-9]+ +([0-9]+|-) +(irq/|xhci|nvme|snd|pipewire|wireplumber|rtkit-daemon|bluetooth)" | sort -k2 -nr | head -n 25 | while read -r pid rtprio comm; do
+        if [[ "$rtprio" != "-" ]]; then
+            printf "  %-10s | %-10s | %-30s\n" "$pid" "$rtprio" "$comm"
+        else
+            # Display non-RT threads with a "0" for visual alignment
+            printf "  %-10s | %-10s | %-30s\n" "$pid" "0 (TS)" "$comm"
+        fi
+    done
+    echo -e "------------------------------------------------------------\n"
+    exit 0
+}
 
 # --------------------------
 # CORE FUNCTIONS
@@ -91,36 +135,44 @@ manage_usb() {
     if [[ "$1" == "on" ]]; then
         echo -1 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
         for pid in $pids; do chrt -f -p $RT_PRIO_USB "$pid"; done
-        for pid in $pids; do
-            prio=$(chrt -p "$pid" 2>/dev/null | awk -F': ' '/priority/ {print $2}' | xargs)
-            confirm "USB PID $pid -> RT priority $prio"
-        done
-        confirm "USB Threads -> autosuspend -1 applied"
+        confirm "USB Threads -> autosuspend -1 & RT Priority $RT_PRIO_USB applied"
     else
         echo 2 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
         for pid in $pids; do chrt -o -p 0 "$pid"; done
-        for pid in $pids; do
-            prio=$(chrt -p "$pid" 2>/dev/null | awk -F': ' '/priority/ {print $2}' | xargs)
-            confirm "USB PID $pid -> RT priority $prio (default)"
-        done
+        confirm "USB Threads -> default"
     fi
 }
 
-# PipeWire threads
+# PipeWire threads & Hardware Sound IRQ priority
 manage_pipewire() {
-    local pids=$(pgrep -x "pipewire")
+    local pw_pids=$(pgrep -x "pipewire")
+    # Identify IRQs for Intel (snd_hda_intel) and AMD (snd_hda_intel or acp)
+    local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
+
     if [[ "$1" == "on" ]]; then
-        for pid in $pids; do chrt -f -p $RT_PRIO_PIPEWIRE "$pid"; done
-        for pid in $pids; do
-            prio=$(chrt -p "$pid" 2>/dev/null | awk -F': ' '/priority/ {print $2}' | xargs)
-            confirm "PipeWire PID $pid -> RT priority $prio"
+        # Boost PipeWire userspace threads
+        for pid in $pw_pids; do
+            chrt -f -p $RT_PRIO_PIPEWIRE "$pid"
         done
+
+        # Boost Hardware Sound Card Interrupts
+        for pid in $sound_irqs; do
+            chrt -f -p $RT_PRIO_SOUND "$pid"
+        done
+
+        confirm "Audio Stack -> PipeWire RT: $RT_PRIO_PIPEWIRE | Sound IRQ RT: $RT_PRIO_SOUND"
     else
-        for pid in $pids; do chrt -o -p 0 "$pid"; done
-        for pid in $pids; do
-            prio=$(chrt -p "$pid" 2>/dev/null | awk -F': ' '/priority/ {print $2}' | xargs)
-            confirm "PipeWire PID $pid -> RT priority $prio (default)"
+        # Revert PipeWire userspace
+        for pid in $pw_pids; do
+            chrt -o -p 0 "$pid"
         done
+
+        # Revert Hardware Sound IRQs
+        for pid in $sound_irqs; do
+            chrt -o -p 0 "$pid"
+        done
+
+        confirm "Audio Stack -> default priority"
     fi
 }
 
@@ -196,29 +248,33 @@ manage_bluetooth() {
             echo 6  | tee "$hci/conn_min_interval" >/dev/null 2>&1
         fi
         for pid in $pids; do chrt -f -p $RT_PRIO_BT "$pid"; done
-        for pid in $pids; do
-            prio=$(chrt -p "$pid" 2>/dev/null | awk -F': ' '/priority/ {print $2}' | xargs)
-            confirm "Bluetooth PID $pid -> RT priority $prio"
-        done
+        confirm "Bluetooth -> Low Latency Polling & RT Priority $RT_PRIO_BT"
     else
         for pid in $pids; do chrt -o -p 0 "$pid"; done
-        for pid in $pids; do
-            prio=$(chrt -p "$pid" 2>/dev/null | awk -F': ' '/priority/ {print $2}' | xargs)
-            confirm "Bluetooth PID $pid -> RT priority $prio (default)"
-        done
+        confirm "Bluetooth -> default"
     fi
 }
 
-# PipeWire quantum & rate
+# PipeWire Restarter & Buffer Manager
 set_pipewire_audio() {
     local quantum=${1:-$DEFAULT_QUANTUM}
     local rate=${2:-$DEFAULT_RATE}
+    local user_uid=$(id -u "$REAL_USER")
 
-    runuser -u "$REAL_USER" -- pw-metadata -n settings 0 clock.force-quantum "$quantum" >/dev/null 2>&1
-    confirm "PipeWire Quantum -> $quantum"
+    notify "Executing PipeWire subsystem restart for user: $REAL_USER..."
 
-    runuser -u "$REAL_USER" -- pw-metadata -n settings 0 clock.force-rate "$rate" >/dev/null 2>&1
-    confirm "PipeWire Sample Rate -> $rate Hz"
+    # We must explicitly define the user's runtime directory so systemctl user daemon commands don't fail as root.
+    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" systemctl --user restart pipewire pipewire-pulse wireplumber >/dev/null 2>&1
+    confirm "PipeWire, Pulse, and WirePlumber services restarted"
+
+    # Allow services 2 seconds to rebuild their graph before injecting metadata overrides
+    sleep 2
+
+    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 clock.force-quantum "$quantum" >/dev/null 2>&1
+    confirm "PipeWire Target Quantum -> $quantum"
+
+    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 clock.force-rate "$rate" >/dev/null 2>&1
+    confirm "PipeWire Target Sample Rate -> $rate Hz"
 }
 
 # SCX Scheduler
@@ -232,13 +288,15 @@ start_scheduler() {
         scxctl start --sched "$sched" --mode "$mode" &
         confirm "Scheduler started -> $sched (Mode: $mode)"
     else
-        echo -e "${RED}SCX Scheduler not found!${NC}"
+        echo -e "${RED}SCX Scheduler (scxctl) not found in PATH!${NC}"
     fi
 }
 
 # Restore defaults
 revert_defaults() {
     notify "Restoring system defaults..."
+
+    # 1. Standard Governors & States
     manage_cpu off
     manage_wifi off
     manage_usb off
@@ -247,45 +305,71 @@ revert_defaults() {
     manage_bluetooth off
     manage_thp off
 
+    # 2. Sound IRQ Specific Revert
+    # We target the same threads found in manage_pipewire
+    local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
+    for pid in $sound_irqs; do
+        chrt -o -p 0 "$pid" >/dev/null 2>&1
+    done
+
+    # 3. Scheduler Cleanup
     if command -v scxctl &>/dev/null; then
         scxctl stop >/dev/null 2>&1
-        confirm "Scheduler stopped"
+        confirm "SCX Scheduler stopped"
     fi
-    notify "System defaults restored"
+
+    notify "System defaults restored (Sound IRQs reset to standard priority)"
 }
 
 # --------------------------
-# HELP FUNCTION
+# VERBOSE HELP FUNCTION (-h)
 # --------------------------
 show_help() {
-    echo -e "${YLW}Linux Gamemode Enhanced${NC}"
-    echo -e "-----------------------------------------------"
+    echo -e "${YLW}Linux Gamemode Enhanced (High-Performance Audio & Gaming Wrapper)${NC}"
+    echo -e "----------------------------------------------------------------------"
+    echo -e "This script forcibly overrides system parameters to prioritize low-latency"
+    echo -e "audio processing, controller polling, and raw GPU performance. It interacts"
+    echo -e "directly with hardware governors, process scheduling, and PipeWire APIs."
 
-    echo -e "${GRN}USAGE:${NC} sudo $0 [OPTIONS]"
-    echo -e "${CYN}OPTIONS:${NC}"
-    echo -e "  ${YLW}-q <quantum>${NC}      PipeWire buffer quantum (default: ${DEFAULT_QUANTUM})"
-    echo -e "  ${YLW}-r <rate>${NC}         PipeWire sample rate (default: ${DEFAULT_RATE} Hz)"
-    echo -e "  ${YLW}-s <scheduler>${NC}    Start SCX scheduler (default: lavd)"
-    echo -e "  ${YLW}-m <mode>${NC}         Mode profile for SCX scheduler (default: lowlatency)"
-    echo -e "  ${YLW}-x${NC}                Restore system defaults"
-    echo -e "  ${YLW}-h${NC}                Show this help message"
+    echo -e "\n${GRN}USAGE:${NC} sudo $0 [OPTIONS]"
 
-    echo -e "\n${YLW}--- SCX Schedulers ---${NC}"
-    echo -e "  * ${GRN}beerland${NC}   - High-throughput, heavy compilation/IO"
-    echo -e "  * ${GRN}bpfland${NC}    - Direct BPF, minimal scheduling overhead"
-    echo -e "  * ${GRN}cosmos${NC}     - High-performance general-purpose"
-    echo -e "  * ${GRN}flash${NC}      - Ultra-aggressive preemption"
-    echo -e "  * ${GRN}lavd${NC}       - Latency-critical Auto-Vblank (Best for Audio)"
-    echo -e "  * ${GRN}p2dq${NC}       - Power-aware Dual Queue (Balanced laptops)"
-    echo -e "  * ${GRN}tickless${NC}   - Reduced timer interrupts for CPU consistency"
-    echo -e "  * ${GRN}rustland${NC}   - High-safety BPF written in Rust"
-    echo -e "  * ${GRN}rusty${NC}      - Efficient modern scheduler for multicore desktops"
+    echo -e "\n${CYN}CORE OPTIONS:${NC}"
+    echo -e "  ${YLW}-q <quantum>${NC}    Forces the PipeWire buffer quantum size. Lower values (e.g., 64, 128)"
+    echo -e "                 decrease audio latency but increase CPU load. (Default: ${DEFAULT_QUANTUM})"
+    echo -e "  ${YLW}-r <rate>${NC}       Forces the PipeWire sample rate. Ensures no resampling occurs"
+    echo -e "                 if matching your game/audio-interface. (Default: ${DEFAULT_RATE} Hz)"
+    echo -e "  ${YLW}-s <scheduler>${NC}  Injects a custom eBPF scheduler via SCX. Overrides the default"
+    echo -e "                 CFS scheduler in the Linux Kernel. (Default: lavd)"
+    echo -e "  ${YLW}-m <mode>${NC}       Applies a specific behavioral profile to the chosen SCX scheduler."
+    echo -e "                 (Default: lowlatency)"
+    echo -e "  ${YLW}-i${NC}             Displays current Audio settings, sample rates, and an"
+    echo -e "                 active hardware Interrupt Request (IRQ) thread breakdown."
+    echo -e "  ${YLW}-x${NC}             Restores all hardware governors, schedulers, and powersave states."
+    echo -e "  ${YLW}-h${NC}             Shows this verbose help message."
+
+    echo -e "\n${YLW}--- BEHAVIORAL MECHANICS ---${NC}"
+    echo -e "  ${GRN}Service Restarts:${NC} Passing -q or -r explicitly stops and restarts all PipeWire"
+    echo -e "                    user services safely using the calling user's DBus/systemd context,"
+    echo -e "                    ensuring zombie audio graphs don't crash games."
+    echo -e "  ${GRN}RT IRQs:${NC}          This script injects Real-Time (FIFO) priority to critical hardware"
+    echo -e "                    polling threads (USB XHCI for controllers, PipeWire, Bluetooth)."
+
+    echo -e "\n${YLW}--- SCX Schedulers (eBPF) ---${NC}"
+    echo -e "  * ${GRN}beerland${NC}   - High-throughput, heavy compilation/IO tasks."
+    echo -e "  * ${GRN}bpfland${NC}    - Direct BPF, minimal scheduling overhead."
+    echo -e "  * ${GRN}cosmos${NC}     - High-performance general-purpose."
+    echo -e "  * ${GRN}flash${NC}      - Ultra-aggressive preemption. Maximum responsiveness, low efficiency."
+    echo -e "  * ${GRN}lavd${NC}       - Latency-critical Auto-Vblank (Best for Audio)."
+    echo -e "  * ${GRN}p2dq${NC}       - Power-aware Dual Queue (Balanced laptops)."
+    echo -e "  * ${GRN}rustland${NC}   - High-safety BPF written in Rust."
+    echo -e "  * ${GRN}rusty${NC}      - Efficient modern scheduler for highly interactive multicore desktop use."
+    echo -e "  * ${GRN}tickless${NC}   - Reduced timer interrupts for CPU consistency."
 
     echo -e "\n${YLW}--- Supported Mode Profiles ---${NC}"
-    echo -e "  * ${CYN}gaming${NC}      - Interactive latency & vblank sync"
-    echo -e "  * ${CYN}lowlatency${NC} - Maximum preemption, RT applications"
-    echo -e "  * ${CYN}powersave${NC}   - Efficient, battery-friendly mode"
-    echo -e "  * ${CYN}balanced${NC}    - Standard desktop responsiveness"
+    echo -e "  * ${CYN}gaming${NC}     - Prioritizes foreground task vblank sync to prevent stutter."
+    echo -e "  * ${CYN}lowlatency${NC} - Favors absolute lowest scheduling delay for RT audio apps."
+    echo -e "  * ${CYN}powersave${NC}  - Efficient, battery-friendly mode."
+    echo -e "  * ${CYN}balanced${NC}   - Standard desktop responsiveness."
 
     echo -e "\n${YLW}--- GPU Setup Options (Editable in config) ---${NC}"
     echo -e "  * ${CYN}nvidia${NC}         - Dedicated NVIDIA GPU"
@@ -298,22 +382,24 @@ show_help() {
     echo -e "  USB       : ${CYN}$RT_PRIO_USB${NC}"
     echo -e "  PipeWire  : ${CYN}$RT_PRIO_PIPEWIRE${NC}"
     echo -e "  Bluetooth : ${CYN}$RT_PRIO_BT${NC}"
+    echo -e "  Sound IRQ : ${CYN}$RT_PRIO_SOUND${NC}"
 
-    echo -e "-----------------------------------------------"
+    echo -e "----------------------------------------------------------------------"
     exit 0
 }
 
 # --------------------------
 # MAIN OPTIONS PARSING
 # --------------------------
-[[ $EUID -ne 0 ]] && { echo -e "${RED}ERROR: Run with sudo${NC}"; exit 1; }
+[[ $EUID -ne 0 ]] && { echo -e "${RED}ERROR: Script must be executed with sudo privileges.${NC}"; exit 1; }
 
-while getopts "q:r:s:m:xh" opt; do
+while getopts "q:r:s:m:ixh" opt; do
     case "$opt" in
         q) QUANTUM=$OPTARG ;;
         r) RATE=$OPTARG ;;
         s) SCHED_NAME=$OPTARG ;;
         m) SCHED_MODE=$OPTARG ;;
+        i) display_status ;;
         x) revert_defaults; exit 0 ;;
         h) show_help ;;
         *) show_help ;;
@@ -323,7 +409,7 @@ done
 # --------------------------
 # ACTIVATE PERFORMANCE MODE
 # --------------------------
-notify "Engaging Linux Audio Performance Mode..."
+notify "Engaging Linux Audio & Gaming Performance Mode..."
 manage_thp on
 manage_cpu on
 manage_wifi on
@@ -333,4 +419,4 @@ manage_gpu on
 manage_bluetooth on
 set_pipewire_audio "$QUANTUM" "$RATE"
 start_scheduler
-notify "Linux Audio Performance Mode -> ACTIVE"
+notify "System Performance Mode -> ACTIVE"
