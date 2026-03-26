@@ -33,7 +33,6 @@ if [[ "$(tty)" == "/dev/tty1" ]]; then
     clear
     sudo $STEAMOS_GAMEMODE -s lavd -m gaming
     $STEAMOS_SESSION_LAUNCHER
-    #$STEAMOS_SESSION_LAUNCHER --hdr --run steam -gamepadui -steamos3 -steamos -steamdeck 2>/dev/null
 
     # Exit SteamOS Session
     clear
