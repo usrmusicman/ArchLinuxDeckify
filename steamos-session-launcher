@@ -43,11 +43,21 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# SteamOS session config file
-STEAMOS_SESSION_CONFIG="/home/$USER/.config/steamos-session/steamos-session-config"
+# Detect the actual user running the session
+REAL_USER=$(whoami)
+USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
-# Load the external config that defines the user's current hardware environment
-source "$STEAMOS_SESSION_CONFIG"
+# SteamOS session config file
+# Using $USER_HOME ensures we point to the correct directory even in edge cases
+STEAMOS_SESSION_CONFIG="$USER_HOME/.config/steamos-session/steamos-session-config"
+
+# Verify the config exists before sourcing to prevent "file not found" errors
+if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
+    source "$STEAMOS_SESSION_CONFIG"
+else
+    echo "Warning: Configuration file not found at $STEAMOS_SESSION_CONFIG"
+    # Set a fallback or exit if critical
+fi
 
 # [GLOBAL]: Pure 64-bit environment for 2026 performance.
 # This eliminates 32-bit thunking overhead for modern titles.

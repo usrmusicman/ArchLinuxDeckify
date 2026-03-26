@@ -12,7 +12,7 @@
 
 # SteamOS Gaming Session
 export STEAMOS_GAMEMODE="/opt/steamos-session/steamos-gamemode-enhanced"
-export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session/steamos-session-launcher"
+export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session-launcher"
 
 #### EXPERIMENTAL ###
 
@@ -26,14 +26,34 @@ export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session/steamos-se
 
 # Logic for SteamOS gaming mode
 if [[ "$(tty)" == "/dev/tty1" ]]; then
+
+    # --- Start of SteamOS Session (Gamescope) ---
+
+    # Launch SteamOS Session
     clear
     sudo $STEAMOS_GAMEMODE -s lavd -m gaming
-    sleep 3
-    clear
-    $STEAMOS_SESSION_LAUNCHER --hdr --run steam -gamepadui -steamos3 -steamos -steamdeck 2>/dev/null
+    $STEAMOS_SESSION_LAUNCHER
+    #$STEAMOS_SESSION_LAUNCHER --hdr --run steam -gamepadui -steamos3 -steamos -steamdeck 2>/dev/null
+
+    # Exit SteamOS Session
     clear
     sudo $STEAMOS_GAMEMODE -x
-    clear
+
+    # --- Start of Plasma ---
+
+    # Reset GPU/Driver overrides from the gaming session to let Plasma auto-detect
+    unset VK_ICD_FILENAMES
+    unset __GLX_VENDOR_LIBRARY_NAME
+    unset MESA_LOADER_DRIVER_OVERRIDE
+
+    # Set Plasma-specific identity
+    export XDG_CURRENT_DESKTOP=KDE
+    export XDG_SESSION_DESKTOP=KDE
+    export XDG_SESSION_TYPE=wayland
+
+    # Launch Plasma KDE 6
     startplasma-wayland
+
+    # Exit login session
     exit 1
 fi
