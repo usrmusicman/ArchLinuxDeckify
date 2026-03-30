@@ -100,26 +100,6 @@ manage_thp() {
     fi
 }
 
-# CPU governor & swappiness
-manage_cpu() {
-    if [[ "$1" == "on" ]]; then
-        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-            echo "performance" | tee "$cpu" >/dev/null 2>&1
-        done
-        for epp in /sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference; do
-            [[ -f "$epp" ]] && echo "performance" | tee "$epp" >/dev/null
-        done
-        echo "10" | tee /proc/sys/vm/swappiness >/dev/null
-        confirm "CPU Governor -> performance"
-    else
-        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-            echo "schedutil" | tee "$cpu" >/dev/null 2>&1 || echo "powersave" | tee "$cpu" >/dev/null 2>&1
-        done
-        echo "60" | tee /proc/sys/vm/swappiness >/dev/null
-        confirm "CPU Governor -> default"
-    fi
-}
-
 # WiFi power save
 manage_wifi() {
     local p_state=$([[ "$1" == "on" ]] && echo "off" || echo "on")
@@ -297,7 +277,6 @@ revert_defaults() {
     notify "Restoring system defaults..."
 
     # 1. Standard Governors & States
-    manage_cpu off
     manage_wifi off
     manage_usb off
     manage_pipewire off
@@ -411,7 +390,6 @@ done
 # --------------------------
 notify "Engaging Linux Audio & Gaming Performance Mode..."
 manage_thp on
-manage_cpu on
 manage_wifi on
 manage_usb on
 manage_pipewire on
