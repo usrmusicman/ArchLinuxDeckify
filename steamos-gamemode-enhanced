@@ -1,4 +1,4 @@
-#!/usr/bin/env /usr/bin/bash
+#!/usr/bin/env bash
 # Gamemode Enhanced
 # Explicit GPU / USB / PipeWire Low-Latency Wrapper
 # Author: Alexander Mcmillan <linuxguy93@gmail.com>
