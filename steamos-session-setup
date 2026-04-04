@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Type in your disred login manager
+LOGIN_MANGER="plasmalogin"
+
 # Define paths
 GETTY_OVERRIDE_DIR="/etc/systemd/system/getty@tty1.service.d"
 GETTY_OVERRIDE_FILE="$GETTY_OVERRIDE_DIR/override.conf"
@@ -31,7 +34,7 @@ cat <<EOF > "$SUDOERS_FILE"
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/nvidia-settings
 
 # SteamOS Enhanced Gamemode
-%wheel ALL=(ALL) NOPASSWD: /opt/steamos-ssession/steamos-gamemode-enhanced
+%wheel ALL=(ALL) NOPASSWD: /opt/steamos-session/steamos-gamemode-enhanced
 EOF
 
 # Set correct permissions for sudoers file
@@ -39,6 +42,7 @@ chmod 440 "$SUDOERS_FILE"
 echo "Sudoers overrides written to $SUDOERS_FILE"
 
 # 3. Enable Service
+systemctl mask ${LOGIN_MANGER}.service
 systemctl daemon-reload
 systemctl enable getty@tty1.service
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env /usr/bin/bash
 # Gamemode Enhanced
 # Explicit GPU / USB / PipeWire Low-Latency Wrapper
 # Author: Alexander Mcmillan <linuxguy93@gmail.com>
@@ -8,7 +8,7 @@
 # --------------------------
 YLW='\033[1;33m'; GRN='\033[1;32m'; CYN='\033[1;36m'; RED='\033[1;31m'; NC='\033[0m'
 notify()  { echo -e "${YLW}[GAMEMODE-ENHANCED]${NC} $1"; }
-confirm() { echo -e "           ↳ ${GRN}APPLIED:${NC} $1"; }
+confirm() { echo -e "            ↳ ${GRN}APPLIED:${NC} $1"; }
 
 # --------------------------
 # USER & CONFIG
@@ -118,15 +118,13 @@ manage_usb() {
         confirm "USB Threads -> autosuspend -1 & RT Priority $RT_PRIO_USB applied"
     else
         echo 2 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
-        for pid in $pids; do chrt -o -p 0 "$pid"; done
-        confirm "USB Threads -> default"
+        confirm "USB Threads -> Power states restored (RT Priority maintained)"
     fi
 }
 
 # PipeWire threads & Hardware Sound IRQ priority
 manage_pipewire() {
     local pw_pids=$(pgrep -x "pipewire")
-    # Identify IRQs for Intel (snd_hda_intel) and AMD (snd_hda_intel or acp)
     local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
 
     if [[ "$1" == "on" ]]; then
@@ -142,17 +140,7 @@ manage_pipewire() {
 
         confirm "Audio Stack -> PipeWire RT: $RT_PRIO_PIPEWIRE | Sound IRQ RT: $RT_PRIO_SOUND"
     else
-        # Revert PipeWire userspace
-        for pid in $pw_pids; do
-            chrt -o -p 0 "$pid"
-        done
-
-        # Revert Hardware Sound IRQs
-        for pid in $sound_irqs; do
-            chrt -o -p 0 "$pid"
-        done
-
-        confirm "Audio Stack -> default priority"
+        confirm "Audio Stack -> Power/Driver states restored (RT Priority maintained)"
     fi
 }
 
@@ -230,8 +218,7 @@ manage_bluetooth() {
         for pid in $pids; do chrt -f -p $RT_PRIO_BT "$pid"; done
         confirm "Bluetooth -> Low Latency Polling & RT Priority $RT_PRIO_BT"
     else
-        for pid in $pids; do chrt -o -p 0 "$pid"; done
-        confirm "Bluetooth -> default"
+        confirm "Bluetooth -> Polling restored (RT Priority maintained)"
     fi
 }
 
@@ -243,11 +230,9 @@ set_pipewire_audio() {
 
     notify "Executing PipeWire subsystem restart for user: $REAL_USER..."
 
-    # We must explicitly define the user's runtime directory so systemctl user daemon commands don't fail as root.
     runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" systemctl --user restart pipewire pipewire-pulse wireplumber >/dev/null 2>&1
     confirm "PipeWire, Pulse, and WirePlumber services restarted"
 
-    # Allow services 2 seconds to rebuild their graph before injecting metadata overrides
     sleep 2
 
     runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 clock.force-quantum "$quantum" >/dev/null 2>&1
@@ -272,9 +257,9 @@ start_scheduler() {
     fi
 }
 
-# Restore defaults
+# Restore defaults (Priority removal logic removed)
 revert_defaults() {
-    notify "Restoring system defaults..."
+    notify "Restoring system defaults (keeping RT priorities)..."
 
     # 1. Standard Governors & States
     manage_wifi off
@@ -284,20 +269,13 @@ revert_defaults() {
     manage_bluetooth off
     manage_thp off
 
-    # 2. Sound IRQ Specific Revert
-    # We target the same threads found in manage_pipewire
-    local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
-    for pid in $sound_irqs; do
-        chrt -o -p 0 "$pid" >/dev/null 2>&1
-    done
-
-    # 3. Scheduler Cleanup
+    # 2. Scheduler Cleanup
     if command -v scxctl &>/dev/null; then
         scxctl stop >/dev/null 2>&1
         confirm "SCX Scheduler stopped"
     fi
 
-    notify "System defaults restored (Sound IRQs reset to standard priority)"
+    notify "System defaults restored (RT Priorities remain active)"
 }
 
 # --------------------------
@@ -323,7 +301,7 @@ show_help() {
     echo -e "                 (Default: lowlatency)"
     echo -e "  ${YLW}-i${NC}             Displays current Audio settings, sample rates, and an"
     echo -e "                 active hardware Interrupt Request (IRQ) thread breakdown."
-    echo -e "  ${YLW}-x${NC}             Restores all hardware governors, schedulers, and powersave states."
+    echo -e "  ${YLW}-x${NC}             Restores all hardware governors, schedulers, and powersave states. (Persists RT Priorities)"
     echo -e "  ${YLW}-h${NC}             Shows this verbose help message."
 
     echo -e "\n${YLW}--- BEHAVIORAL MECHANICS ---${NC}"
