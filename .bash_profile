@@ -51,7 +51,7 @@ if [[ "$(tty)" == "/dev/tty1" ]]; then
     export XDG_SESSION_TYPE=wayland
 
     # Launch Plasma KDE 6
-    startplasma-wayland
+    dbus-run-session startplasma-wayland
 
     # Exit login session
     exit 1
