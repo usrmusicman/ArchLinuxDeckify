@@ -24,8 +24,12 @@ export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session-launcher"
 # Session Logic
 # ------------------------------------------------
 
-# Logic for SteamOS gaming mode
-if [[ "$(tty)" == "/dev/tty6" ]]; then
+# Logic for SteamOS gaming mode triggered by the switcher script
+if [[ "$(tty)" == "/dev/tty6" && -f /tmp/game_session_target ]]; then
+
+    # Read the binary and clean up the temp file immediately to prevent loops
+    SESSION_BINARY=$(cat /tmp/game_session_target)
+    rm /tmp/game_session_target
 
     # --- Start of SteamOS Session (Gamescope) ---
 
@@ -45,7 +49,7 @@ if [[ "$(tty)" == "/dev/tty6" ]]; then
     # Launch SteamOS Session
     clear
     sudo $STEAMOS_GAMEMODE -s lavd -m gaming
-    $STEAMOS_SESSION_LAUNCHER
+    $STEAMOS_SESSION_LAUNCHER --session "$SESSION_BINARY"
 
     # Exit SteamOS Session
     clear
@@ -64,5 +68,8 @@ if [[ "$(tty)" == "/dev/tty6" ]]; then
     else
         echo "Display manager not supported"
     fi
+
+    unset SESSION_BINARY
+    logout
 
 fi

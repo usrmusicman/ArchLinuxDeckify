@@ -54,9 +54,20 @@ STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
 REAL_USER=$(whoami)
 USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
+# The virtual terminal switching mechanism for launching on tty6
+STEAMOS_SESSION_SWITCHER="/opt/steamos-session/steamos-session-switcher"
+
 # SteamOS session config file
 # Using $USER_HOME ensures we point to the correct directory even in edge cases
 STEAMOS_SESSION_CONFIG="$USER_HOME/.config/steamos-session/steamos-session-config"
+
+# Verify the config exists before sourcing to prevent "file not found" errors
+if [[ -f "$STEAMOS_SESSION_SWITCHER" ]]; then
+    source "$STEAMOS_SESSION_SWITCHER"
+else
+    echo "Warning: Configuration file not found at $STEAMOS_SESSION_SWITCHER"
+    # Set a fallback or exit if critical
+fi
 
 # Verify the config exists before sourcing to prevent "file not found" errors
 if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then

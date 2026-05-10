@@ -34,6 +34,9 @@ EOF
 # SteamOS Enhanced Gamemode
 %wheel ALL=(ALL) NOPASSWD: /opt/steamos-session/steamos-gamemode-enhanced
 
+# SteamOS TTY Handoff
+%wheel ALL=(ALL) NOPASSWD: /opt/steamos-session/steamos-session-switcher
+
 # Change Virtual Terminals (All 6 Supported Archlinux TTY Termianls)
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/chvt 6
 
@@ -52,9 +55,6 @@ EOF
 # Start and Stop SDDM Display Manager
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start sddm.service
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop sddm.service
-
-# Force end the tty6 session
-%wheel ALL=(ALL) NOPASSWD: /usr/bin/openvt -c 6 -s --force -- /usr/bin/exit
 EOF
 
    # Set correct permissions for sudoers file

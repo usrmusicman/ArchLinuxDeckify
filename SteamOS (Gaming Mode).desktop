@@ -1,7 +1,8 @@
+#!/usr/bin/env xdg-open
 [Desktop Entry]
 Type=Application
 Name=SteamOS Gaming Mode
-Exec=sh -c "env SESSION_BINARY="/usr/bin/steam" sudo /usr/bin/openvt -c 6 -s --force -- /usr/bin/exit"
+Exec=/opt/steamos-session/steamos-session-switcher /usr/bin/steam
 Icon=/usr/share/icons/distributor-logo-steamdeck.svg
 Terminal=false
 Categories=Games;
