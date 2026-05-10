@@ -310,7 +310,7 @@ if [[ -x "$SESSION_BINARY" ]]; then
     echo "Launching session: $SESSION_BINARY"
 
     # Check if we are launching Steam specifically to apply SteamOS UI flags
-    if [[ "$SESSION_BINARY" == *"/steam" ]]; then
+    if [[ "$SESSION_BINARY" == "/usr/bin/steam" ]]; then
         exec gamescope "${GS_ARGS[@]}" -- "$SESSION_BINARY" $STEAMOS_FLAGS
     else
         # Launch generic session (RetroArch, Lutris, Firefox, etc.)
