@@ -12,6 +12,9 @@
 # 1. INITIALIZATION & ARGUMENT PARSING
 # ------------------------------------------------------------------------------
 
+# Set GPU Priority CAP
+sudo setcap 'cap_sys_nice=eip' $(which gamescope)
+
 # Default values
 ENABLE_HDR=false
 TARGET_CMD=""
@@ -264,6 +267,7 @@ GS_ARGS=(
   "--adaptive-sync"         # VRR/G-Sync/FreeSync
   "--immediate-flips"       # Lowest possible latency (Tearing allowed if out of VRR)
   "--force-grab-cursor"     # Prevent mouse escaping the game window
+  "--grab"     # Prevent mouse escaping the game window
   "-S" "fit"                # Scaling mode
   "-F" "$UPSCALE_FILTER"    # fsr, nis, or linear
   "--sharpness" "$SHARPNESS"
@@ -319,7 +323,8 @@ if [[ -x "$BIN_PATH" ]]; then
             -H "$SCREENHEIGHT" \
             -r "$REFRESHRATE" \
             -f \
-            --backend wayland \
+            --force-grab-cursor \
+            --grab \
             -- $TARGET_CMD
     fi
 else
