@@ -14,33 +14,29 @@
 
 # Default values
 ENABLE_HDR=false
-SESSION_BINARY="" # Default to empty
+TARGET_CMD=""
 
 # CLI Switch Logic
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --hdr)
-            # Toggles HDR
             ENABLE_HDR=true
             shift
             ;;
-        --session)
-            # Explicitly set the session binary (e.g., /usr/bin/steam or /usr/bin/retroarch)
-            SESSION_BINARY="$2"
-            shift 2
-            ;;
         --run)
-            # Run a command
+            # Shift past the --run flag
             shift
+            # Capture every remaining argument as the command to execute.
             if [[ -n "$*" ]]; then
                 TARGET_CMD="$*"
             fi
+            # Break is essential here so the script doesn't try to
+            # parse the game's own flags as script flags.
             break
             ;;
         *)
-            # Run when no argument is provided
             echo "Unknown parameter: $1"
-            echo "Usage: $0 [--hdr] [--session /path/to/binary] [--run command args]"
+            echo "Usage: $0 [--hdr] --run <binary path> [args]"
             exit 1
             ;;
     esac
@@ -54,20 +50,9 @@ STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
 REAL_USER=$(whoami)
 USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
-# The virtual terminal switching mechanism for launching on tty6
-# STEAMOS_SESSION_SWITCHER="/opt/steamos-session/steamos-session-switcher"
-
 # SteamOS session config file
 # Using $USER_HOME ensures we point to the correct directory even in edge cases
 STEAMOS_SESSION_CONFIG="$USER_HOME/.config/steamos-session/steamos-session-config"
-
-# Verify the config exists before sourcing to prevent "file not found" errors
-# if [[ -f "$STEAMOS_SESSION_SWITCHER" ]]; then
-    # source "$STEAMOS_SESSION_SWITCHER"
-# else
-    # echo "Warning: Configuration file not found at $STEAMOS_SESSION_SWITCHER"
-    # Set a fallback or exit if critical
-# fi
 
 # Verify the config exists before sourcing to prevent "file not found" errors
 if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
@@ -297,26 +282,28 @@ fi
 # 5. FINAL LAUNCH
 # ------------------------------------------------------------------------------
 
-# Execute the compositor and the target application (Default Steam or User Choice)
-
-# Verify we actually have something to run
-if [[ -z "$SESSION_BINARY" ]]; then
-    echo "Error: No session binary specified. Use --session <path>"
+# Verify we have a command to execute
+if [[ -z "$TARGET_CMD" ]]; then
+    echo "Error: No command specified. Use --run <command>"
     exit 1
 fi
 
-# Check if the file is executable
-if [[ -x "$SESSION_BINARY" ]]; then
-    echo "Launching session: $SESSION_BINARY"
+# Extract the first word to check if it's an executable binary
+# This handles cases like --run /usr/bin/steam
+BIN_PATH=$(echo "$TARGET_CMD" | awk '{print $1}')
 
-    # Check if we are launching Steam specifically to apply SteamOS UI flags
-    if [[ "$SESSION_BINARY" == "/usr/bin/steam" ]]; then
-        exec gamescope "${GS_ARGS[@]}" -- "$SESSION_BINARY" $STEAMOS_FLAGS
+if [[ -x "$BIN_PATH" ]]; then
+    echo "Launching: $TARGET_CMD"
+
+    # Specific logic for Steam to apply Gamepad UI flags
+    if [[ "$BIN_PATH" == "/usr/bin/steam" ]]; then
+        # We append the flags to the existing command
+        exec gamescope "${GS_ARGS[@]}" -- $TARGET_CMD $STEAMOS_FLAGS
     else
-        # Launch generic session (RetroArch, Lutris, Firefox, etc.)
-        exec gamescope "${GS_ARGS[@]}" -- "$SESSION_BINARY"
+        # Launch generic session (RetroArch, Lutris, etc.)
+        exec gamescope "${GS_ARGS[@]}" -- $TARGET_CMD
     fi
 else
-    echo "Error: Binary '$SESSION_BINARY' not found or not executable."
+    echo "Error: Binary '$BIN_PATH' not found or not executable."
     exit 1
 fi

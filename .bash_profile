@@ -49,7 +49,7 @@ if [[ "$(tty)" == "/dev/tty6" && -f /tmp/game_session_target ]]; then
     # Launch SteamOS Session
     clear
     sudo $STEAMOS_GAMEMODE -s lavd -m gaming
-    $STEAMOS_SESSION_LAUNCHER --session "$SESSION_BINARY"
+    $STEAMOS_SESSION_LAUNCHER --run "$SESSION_BINARY"
 
     # Exit SteamOS Session
     clear
