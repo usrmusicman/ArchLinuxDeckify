@@ -12,36 +12,43 @@
 # 1. INITIALIZATION & ARGUMENT PARSING
 # ------------------------------------------------------------------------------
 
-# Default values if no flags are passed
+# Default values
 ENABLE_HDR=false
-TARGET_CMD="steam -gamepadui -steamos3 -steamos -steamdeck"
+SESSION_BINARY="" # Default to empty
 
 # CLI Switch Logic
-# Usage: ./session.sh --hdr --run <command> <args>
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --hdr)
-            # High Dynamic Range toggle for Gamescope
+            # Toggles HDR
             ENABLE_HDR=true
             shift
             ;;
+        --session)
+            # Explicitly set the session binary (e.g., /usr/bin/steam or /usr/bin/retroarch)
+            SESSION_BINARY="$2"
+            shift 2
+            ;;
         --run)
-            # Shift past the --run flag
+            # Run a command
             shift
-            # Capture every remaining argument as a single command string.
-            # This allows for infinitely long commands with complex parameters.
             if [[ -n "$*" ]]; then
                 TARGET_CMD="$*"
             fi
-            # Break ensures we don't try to parse game-specific flags as script flags
             break
             ;;
         *)
+            # Run when no argument is provided
             echo "Unknown parameter: $1"
+            echo "Usage: $0 [--hdr] [--session /path/to/binary] [--run command args]"
             exit 1
             ;;
     esac
 done
+
+# Define Steam-specific command flags
+# We only use this if SESSION_BINARY ends up being steam
+STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
 
 # Detect the actual user running the session
 REAL_USER=$(whoami)
@@ -280,5 +287,25 @@ fi
 # ------------------------------------------------------------------------------
 
 # Execute the compositor and the target application (Default Steam or User Choice)
-# 'exec' replaces the shell process with gamescope for better signal handling.
-exec gamescope "${GS_ARGS[@]}" -- $TARGET_CMD
+
+# Verify we actually have something to run
+if [[ -z "$SESSION_BINARY" ]]; then
+    echo "Error: No session binary specified. Use --session <path>"
+    exit 1
+fi
+
+# Check if the file is executable
+if [[ -x "$SESSION_BINARY" ]]; then
+    echo "Launching session: $SESSION_BINARY"
+
+    # Check if we are launching Steam specifically to apply SteamOS UI flags
+    if [[ "$SESSION_BINARY" == *"/steam" ]]; then
+        exec gamescope "${GS_ARGS[@]}" -- "$SESSION_BINARY" $STEAMOS_FLAGS
+    else
+        # Launch generic session (RetroArch, Lutris, Firefox, etc.)
+        exec gamescope "${GS_ARGS[@]}" -- "$SESSION_BINARY"
+    fi
+else
+    echo "Error: Binary '$SESSION_BINARY' not found or not executable."
+    exit 1
+fi
