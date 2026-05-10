@@ -64,6 +64,9 @@ fi
 # NOTE: If EAC (Easy Anti-Cheat) titles fail, comment this out.
 export PROTON_USE_WOW64=1
 
+# Enable the use of the new WINENTSYNC implementation to reduce loading and streaming overhead
+export WINENTSYNC=1
+
 # SESSION TYPE SETTINGS
 export XDG_SESSION_TYPE=wayland
 export SDL_VIDEODRIVER=wayland
