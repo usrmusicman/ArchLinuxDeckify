@@ -279,31 +279,50 @@ if [ "$ENABLE_HDR" = true ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 5. FINAL LAUNCH
+# 5. FINAL LAUNCH (PURE WAYLAND MODE)
 # ------------------------------------------------------------------------------
 
-# Verify we have a command to execute
+# Verify we have a command
 if [[ -z "$TARGET_CMD" ]]; then
-    echo "Error: No command specified. Use --run <command>"
+    echo "Error: No command specified."
     exit 1
 fi
 
-# Extract the first word to check if it's an executable binary
-# This handles cases like --run /usr/bin/steam
+# Extract binary
 BIN_PATH=$(echo "$TARGET_CMD" | awk '{print $1}')
 
-if [[ -x "$BIN_PATH" ]]; then
-    echo "Launching: $TARGET_CMD"
+# Force the application to use Wayland backends
+export SDL_VIDEODRIVER=wayland
+export _JAVA_AWT_WM_NONREPARENTING=1
+export QT_QPA_PLATFORM=wayland
+export GDK_BACKEND=wayland
 
-    # Specific logic for Steam to apply Gamepad UI flags
+# Check if the binary is executable
+if [[ -x "$BIN_PATH" ]]; then
+    echo "Launching Pure Wayland Session..."
+
+    # If you want to disable the XWayland server entirely in Gamescope:
+    # Note: Modern Gamescope uses --xwayland by default.
+    # To go Wayland-only, we avoid flags that trigger Xwayland.
+
     if [[ "$BIN_PATH" == "/usr/bin/steam" ]]; then
-        # We append the flags to the existing command
-        exec gamescope "${GS_ARGS[@]}" -- $TARGET_CMD $STEAMOS_FLAGS
+        # Steam still requires XWayland for many web-views and older games,
+        # so we keep it for Steam.
+        exec gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
     else
-        # Launch generic session (RetroArch, Lutris, etc.)
-        exec gamescope "${GS_ARGS[@]}" -- $TARGET_CMD
+        # FOR RETROARCH / NATIVE APPS:
+        # We run gamescope WITHOUT the --xwayland-count or X11 specific flags
+        # if your version supports --backend wayland, add it here.
+
+        exec gamescope \
+            -W "$SCREENWIDTH" \
+            -H "$SCREENHEIGHT" \
+            -r "$REFRESHRATE" \
+            -f \
+            --backend wayland \
+            -- $TARGET_CMD
     fi
 else
-    echo "Error: Binary '$BIN_PATH' not found or not executable."
+    echo "Error: Binary '$BIN_PATH' not found."
     exit 1
 fi
