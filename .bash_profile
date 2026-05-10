@@ -25,9 +25,22 @@ export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session-launcher"
 # ------------------------------------------------
 
 # Logic for SteamOS gaming mode
-if [[ "$(tty)" == "/dev/tty1" ]]; then
+if [[ "$(tty)" == "/dev/tty6" ]]; then
 
     # --- Start of SteamOS Session (Gamescope) ---
+
+    # Stop Plasma
+    if [[ -x "/usr/bin/gdm" ]]; then
+        sudo systemctl stop gdm.service
+    elif [[ -x "/usr/bin/lightdm" ]]; then
+        sudo systemctl stop lightdm.service
+    elif [[ -x "/usr/bin/plasmalogin" ]]; then
+        sudo systemctl stop plasmalogin.service
+    elif [[ -x "/usr/bin/sddm" ]]; then
+        sudo systemctl stop sddm.service
+    else
+        echo "Display manager not supported"
+    fi
 
     # Launch SteamOS Session
     clear
@@ -38,21 +51,18 @@ if [[ "$(tty)" == "/dev/tty1" ]]; then
     clear
     sudo $STEAMOS_GAMEMODE -x
 
-    # --- Start of Plasma ---
+    # Start of Plasma
+    if [[ -x "/usr/bin/gdm" ]]; then
+        sudo systemctl start gdm.service
+    elif [[ -x "/usr/bin/lightdm" ]]; then
+        sudo systemctl start lightdm.service
+    elif [[ -x "/usr/bin/plasmalogin" ]]; then
+        sudo systemctl start plasmalogin.service
+    elif [[ -x "/usr/bin/sddm" ]]; then
+        sudo systemctl start sddm.service
+    else
+        echo "Display manager not supported"
+    fi
 
-    # Reset GPU/Driver overrides from the gaming session to let Plasma auto-detect
-    unset VK_ICD_FILENAMES
-    unset __GLX_VENDOR_LIBRARY_NAME
-    unset MESA_LOADER_DRIVER_OVERRIDE
 
-    # Set Plasma-specific identity
-    export XDG_CURRENT_DESKTOP=KDE
-    export XDG_SESSION_DESKTOP=KDE
-    export XDG_SESSION_TYPE=wayland
-
-    # Launch Plasma KDE 6
-    dbus-run-session startplasma-wayland
-
-    # Exit login session
-    exit 1
 fi
