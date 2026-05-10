@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SteamOS Gaming Mode
+Exec=bash -c `sudo chvt 6`
+Icon=/usr/share/icons/distributor-logo-steamdeck.svg
+Terminal=false
+Categories=Games;
+StartupNotify=true
