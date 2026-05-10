@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=SteamOS Gaming Mode
-Exec=bash -c `sudo /usr/bin/chvt 6`
+Exec=sh -c "sudo /usr/bin/openvt -c 6 -s --force -- /usr/bin/exit"
 Icon=/usr/share/icons/distributor-logo-steamdeck.svg
 Terminal=false
 Categories=Games;

@@ -31,13 +31,13 @@ if [[ "$(tty)" == "/dev/tty6" ]]; then
 
     # Stop Plasma
     if [[ -x "/usr/bin/gdm" ]]; then
-        sudo systemctl stop gdm.service
+        sudo /usr/bin/systemctl stop gdm.service
     elif [[ -x "/usr/bin/lightdm" ]]; then
-        sudo systemctl stop lightdm.service
+        sudo /usr/bin/systemctl stop lightdm.service
     elif [[ -x "/usr/bin/plasmalogin" ]]; then
-        sudo systemctl stop plasmalogin.service
+        sudo /usr/bin/systemctl stop plasmalogin.service
     elif [[ -x "/usr/bin/sddm" ]]; then
-        sudo systemctl stop sddm.service
+        sudo /usr/bin/systemctl stop sddm.service
     else
         echo "Display manager not supported"
     fi
@@ -50,19 +50,19 @@ if [[ "$(tty)" == "/dev/tty6" ]]; then
     # Exit SteamOS Session
     clear
     sudo $STEAMOS_GAMEMODE -x
+    clear
 
     # Start of Plasma
     if [[ -x "/usr/bin/gdm" ]]; then
-        sudo systemctl start gdm.service
+        sudo /usr/bin/systemctl start gdm.service
     elif [[ -x "/usr/bin/lightdm" ]]; then
-        sudo systemctl start lightdm.service
+        sudo /usr/bin/systemctl start lightdm.service
     elif [[ -x "/usr/bin/plasmalogin" ]]; then
-        sudo systemctl start plasmalogin.service
+        sudo /usr/bin/systemctl start plasmalogin.service
     elif [[ -x "/usr/bin/sddm" ]]; then
-        sudo systemctl start sddm.service
+        sudo /usr/bin/systemctl start sddm.service
     else
         echo "Display manager not supported"
     fi
-
 
 fi
