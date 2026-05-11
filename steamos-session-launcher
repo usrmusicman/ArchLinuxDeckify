@@ -12,9 +12,6 @@
 # 1. INITIALIZATION & ARGUMENT PARSING
 # ------------------------------------------------------------------------------
 
-# Set GPU Priority CAP
-sudo setcap 'cap_sys_nice=eip' $(which gamescope)
-
 # Default values
 ENABLE_HDR=false
 TARGET_CMD=""

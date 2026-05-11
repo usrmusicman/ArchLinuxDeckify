@@ -55,6 +55,9 @@ EOF
 # Start and Stop SDDM Display Manager
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl start sddm.service
 %wheel ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop sddm.service
+
+# Force end the tty6 session
+%wheel ALL=(ALL) NOPASSWD: /usr/bin/openvt *
 EOF
 
    # Set correct permissions for sudoers file
@@ -64,6 +67,9 @@ EOF
    # Enable Getty TTY6 Autologin Service
    systemctl daemon-reload
    systemctl enable getty@tty6.service
+
+   # Set GPU Priority CAP
+   setcap 'cap_sys_nice=eip' $(which gamescope)
 
    # Create the bash profile for the session
    cp ".bash_profile" "$USER_SH_PROFILE"
