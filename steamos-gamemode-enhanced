@@ -37,7 +37,7 @@ RT_PRIO_BT=${RT_PRIO_BT:-85}        # Priority for Bluetooth kernel threads
 RT_PRIO_SOUND=${RT_PRIO_SOUND:-80}   # Priority for Sound Card hardware interrupts
 
 # Launcher defaults for pw-jack
-DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-128}
+DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-256}
 DEFAULT_RATE=${DEFAULT_RATE:-48000}
 
 # --------------------------
@@ -57,7 +57,7 @@ display_status() {
     echo -e "------------------------------------------------------------"
 
     # Fetch process list, filtering for hardware-critical threads
-    ps -eo pid,rtprio,comm | grep -iE "^ *[0-9]+ +([0-9]+|-) +(irq/|xhci|nvme|snd|pipewire|wireplumber|rtkit-daemon|bluetooth)" | sort -k2 -nr | head -n 25 | while read -r pid rtprio comm; do
+    ps -eo pid,rtprio,comm | grep -iE "^ *[0-9]+ +([0-9]+|-) +(irq/|xhci|nvme|snd|wireplumber|rtkit-daemon|bluetooth)" | sort -k2 -nr | head -n 25 | while read -r pid rtprio comm; do
         if [[ "$rtprio" != "-" ]]; then
             printf "  %-10s | %-10s | %-30s\n" "$pid" "$rtprio" "$comm"
         else
@@ -94,6 +94,28 @@ manage_wifi() {
     confirm "WiFi Power Save -> $p_state"
 }
 
+manage_soundcards() {
+    # Identify PIDs for Intel HDA and AMD ACP (onboard audio controllers)
+    local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
+
+    if [[ "$1" == "on" ]]; then
+        # Check if any PIDs were actually found to avoid empty loop errors
+        if [[ -n "$sound_irqs" ]]; then
+            for pid in $sound_irqs; do
+                # Double-check: RT_PRIO_SOUND must be a non-empty integer > 0
+                if [[ -n "$RT_PRIO_SOUND" && "$RT_PRIO_SOUND" -gt 0 ]]; then
+                    # Force FIFO policy for Real-Time priority
+                    chrt -f -p "$RT_PRIO_SOUND" "$pid" 2>/dev/null
+                else
+                    # Use OTHER policy for priority 0 (standard)
+                    chrt -o -p 0 "$pid" 2>/dev/null
+                fi
+            done
+            confirm "Onboard Sound -> RT Priority $RT_PRIO_SOUND Applied"
+        fi
+    fi
+}
+
 # Configure USB polling threads for Real-Time execution
 manage_usb() {
     local pids=$(pgrep -f "xhci")
@@ -101,30 +123,18 @@ manage_usb() {
         # Disable power autosuspend to prevent USB controller "sleep" latency
         echo -1 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
         # Apply SCHED_FIFO (Real-Time) to USB controllers
-        for pid in $pids; do chrt -f -p $RT_PRIO_USB "$pid"; done
+        for pid in $pids; do
+            if [[ "$RT_PRIO_USB" -gt 0 ]]; then
+                chrt -f -p "$RT_PRIO_USB" "$pid"
+            else
+                # If 0, reset to the default scheduling policy
+                chrt -o -p 0 "$pid"
+            fi
+        done
         confirm "USB -> RT Priority $RT_PRIO_USB & Autosuspend -1"
     else
         echo 2 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
         confirm "USB -> Default states restored"
-    fi
-}
-
-# Set Audio threads to Real-Time and unlock global buffer constraints
-manage_pipewire() {
-    local pw_pids=$(pgrep -x "pipewire")
-    local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
-
-    if [[ "$1" == "on" ]]; then
-        # Boost PipeWire daemon
-        for pid in $pw_pids; do chrt -f -p $RT_PRIO_PIPEWIRE "$pid"; done
-        # Boost Sound hardware interrupts
-        for pid in $sound_irqs; do chrt -f -p $RT_PRIO_SOUND "$pid"; done
-
-        # Crucial: Unlocking the global force-quantum fixes crackling in non-gaming apps
-        local user_uid=$(id -u "$REAL_USER")
-        runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 clock.force-quantum 0 >/dev/null 2>&1
-
-        confirm "Audio -> RT Priority applied (Global Quantum Unlocked)"
     fi
 }
 
@@ -252,7 +262,6 @@ show_help() {
 
     echo -e "\n${YLW}--- RT Priority Defaults (Editable in config) ---${NC}"
     echo -e "  USB       : ${CYN}$RT_PRIO_USB${NC}"
-    echo -e "  PipeWire  : ${CYN}$RT_PRIO_PIPEWIRE${NC}"
     echo -e "  Bluetooth : ${CYN}$RT_PRIO_BT${NC}"
     echo -e "  Sound IRQ : ${CYN}$RT_PRIO_SOUND${NC}"
 
@@ -286,8 +295,8 @@ done
 notify "Engaging Performance Mode..."
 manage_thp on
 manage_wifi on
+manage_soundcards on
 manage_usb on
-manage_pipewire on
 manage_gpu on
 start_scheduler
 
