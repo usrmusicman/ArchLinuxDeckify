@@ -14,6 +14,7 @@
 
 # Default values
 ENABLE_HDR=false
+EXPERIMENTAL_WAYLAND=false # Experimental toggle
 TARGET_CMD=""
 
 # CLI Switch Logic
@@ -23,20 +24,17 @@ while [[ "$#" -gt 0 ]]; do
             ENABLE_HDR=true
             shift
             ;;
-        --run)
-            # Shift past the --run flag
+        --wayland-native) # New experimental flag
+            EXPERIMENTAL_WAYLAND=true
             shift
-            # Capture every remaining argument as the command to execute.
-            if [[ -n "$*" ]]; then
-                TARGET_CMD="$*"
-            fi
-            # Break is essential here so the script doesn't try to
-            # parse the game's own flags as script flags.
+            ;;
+        --run)
+            shift
+            [[ -n "$*" ]] && TARGET_CMD="$*"
             break
             ;;
         *)
             echo "Unknown parameter: $1"
-            echo "Usage: $0 [--hdr] --run <binary path> [args]"
             exit 1
             ;;
     esac
@@ -270,8 +268,18 @@ GS_ARGS=(
   "--sharpness" "$SHARPNESS"
   "--mangoapp"              # Performance overlay support
   "--steam"                 # Integration with Steam UI
-  "--xwayland-count" "2"    # Extra instance for overlay stability
 )
+
+if [ "$EXPERIMENTAL_WAYLAND" = true ]; then
+    # Use the new experimental pass-through
+    GS_ARGS+=("--expose-wayland")
+    # We reduce or remove XWayland instances to keep the pipe pure
+    # Some builds require at least 1 for the Steam overlay to function
+    GS_ARGS+=("--xwayland-count" "1")
+else
+    # Standard stable mode
+    GS_ARGS+=("--xwayland-count" "2")
+fi
 
 # Apply HDR if the --hdr switch was used
 if [ "$ENABLE_HDR" = true ]; then
@@ -306,23 +314,11 @@ if [[ -x "$BIN_PATH" ]]; then
     # Note: Modern Gamescope uses --xwayland by default.
     # To go Wayland-only, we avoid flags that trigger Xwayland.
 
-    if [[ "$BIN_PATH" == "/usr/bin/steam" ]]; then
-        # Steam still requires XWayland for many web-views and older games,
-        # so we keep it for Steam.
-        exec gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
+    # Execute within the dbus-run-session as discussed for TTY stability
+    if [[ "$BIN_PATH" == *"/steam" ]]; then
+        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
     else
-        # FOR RETROARCH / NATIVE APPS:
-        # We run gamescope WITHOUT the --xwayland-count or X11 specific flags
-        # if your version supports --backend wayland, add it here.
-
-        exec gamescope \
-            -W "$SCREENWIDTH" \
-            -H "$SCREENHEIGHT" \
-            -r "$REFRESHRATE" \
-            -f \
-            --force-grab-cursor \
-            --grab \
-            -- $TARGET_CMD
+        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- $TARGET_CMD
     fi
 else
     echo "Error: Binary '$BIN_PATH' not found."
