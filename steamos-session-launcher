@@ -270,14 +270,23 @@ GS_ARGS=(
   "--steam"                 # Integration with Steam UI
 )
 
+# In the GS_ARGS section, update the Wayland block:
 if [ "$EXPERIMENTAL_WAYLAND" = true ]; then
-    # Use the new experimental pass-through
+    echo "Forcing Pure Wayland Environment..."
+
+    # This is the 'Master Switch' for modern Gamescope
     GS_ARGS+=("--expose-wayland")
-    # We reduce or remove XWayland instances to keep the pipe pure
-    # Some builds require at least 1 for the Steam overlay to function
-    GS_ARGS+=("--xwayland-count" "1")
+
+    # We disable the XWayland server for the app if possible
+    # or set it to 0 to see if your build supports a truly headless X11 mode
+    GS_ARGS+=("--xwayland-count" "0")
+
+    # Force the application's toolkit to bypass X11
+    export SDL_VIDEODRIVER=wayland
+    export GDK_BACKEND=wayland
+    export QT_QPA_PLATFORM=wayland
+    export CLUTTER_BACKEND=wayland
 else
-    # Standard stable mode
     GS_ARGS+=("--xwayland-count" "2")
 fi
 
