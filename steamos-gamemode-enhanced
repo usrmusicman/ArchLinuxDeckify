@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gamemode Enhanced
+# Gamemode Enhanced + pw-jack Launcher
 # Explicit GPU / USB / PipeWire Low-Latency Wrapper
 # Author: Alexander Mcmillan <linuxguy93@gmail.com>
 
@@ -14,13 +14,13 @@ confirm() { echo -e "            ↳ ${GRN}APPLIED:${NC} $1"; }
 # USER & CONFIG
 # --------------------------
 
-# User running sudo command
+# Identify the actual user to handle XDG_RUNTIME and PipeWire socket paths correctly when run as sudo
 REAL_USER=${SUDO_USER:-$USER}
 
-# SteamOS session config file
+# Path for SteamOS specific session configurations for Deck users
 STEAMOS_SESSION_CONFIG="/home/$REAL_USER/.config/steamos-session/steamos-session-config"
 
-# Load session config
+# Load session config if available; otherwise, the script uses the hardcoded defaults below
 if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
     source "$STEAMOS_SESSION_CONFIG"
 else
@@ -28,16 +28,16 @@ else
 fi
 
 # --------------------------
-# DEFAULTS (if not defined in config)
+# DEFAULTS
 # --------------------------
 GPU_SETUP=${GPU_SETUP:-generic}
-RT_PRIO_USB=${RT_PRIO_USB:-90}
-RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-80}
-RT_PRIO_BT=${RT_PRIO_BT:-85}
-RT_PRIO_SOUND=${RT_PRIO_SOUND:-70}
+RT_PRIO_USB=${RT_PRIO_USB:-95}       # Priority for USB host controllers (Controllers/Mice)
+RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-90} # Priority for PipeWire audio daemon
+RT_PRIO_BT=${RT_PRIO_BT:-85}        # Priority for Bluetooth kernel threads
+RT_PRIO_SOUND=${RT_PRIO_SOUND:-80}   # Priority for Sound Card hardware interrupts
 
-# Pipewire Settings
-DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-256}
+# Launcher defaults for pw-jack
+DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-128}
 DEFAULT_RATE=${DEFAULT_RATE:-48000}
 
 # --------------------------
@@ -47,35 +47,21 @@ display_status() {
     notify "Gathering Current System & Audio Status..."
     local user_uid=$(id -u "$REAL_USER")
 
-    echo -e "\n${YLW}=== AUDIO ENVIRONMENT ===${NC}"
+    echo -e "\n${YLW}=== ENVIRONMENT ===${NC}"
     echo -e "${GRN}Active User:${NC} $REAL_USER (UID: $user_uid)"
 
-    # Improved metadata extraction logic
-    local pw_settings=$(runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 2>/dev/null)
-
-    # We use sed to grab only the digits/values following the key names
-    local cur_quantum=$(echo "$pw_settings" | grep "clock.force-quantum" | sed -E 's/.*value:[[:space:]]*([^[:space:]]*).*/\1/' | tr -d "'")
-    local cur_rate=$(echo "$pw_settings" | grep "clock.force-rate" | sed -E 's/.*value:[[:space:]]*([^[:space:]]*).*/\1/' | tr -d "'")
-
-    # Check if values are 0 or empty (PipeWire's way of saying "Auto/Dynamic")
-    [[ "$cur_quantum" == "0" || -z "$cur_quantum" ]] && cur_quantum="Dynamic (Auto)"
-    [[ "$cur_rate" == "0" || -z "$cur_rate" ]] && cur_rate="Dynamic (Auto)"
-
-    echo -e "  * Sample Rate : ${CYN}${cur_rate}${NC}"
-    echo -e "  * Quantum Buf : ${CYN}${cur_quantum}${NC}"
-
     echo -e "\n${YLW}=== THREADED IRQs (Interrupt Requests) ===${NC}"
-    echo -e "Displaying top hardware interrupts and audio threads sorted by RT Priority:"
+    echo -e "Displaying hardware interrupts sorted by Real-Time (RT) Priority:"
     echo -e "------------------------------------------------------------"
     printf "  %-10s | %-10s | %-30s\n" "PID" "RT PRIO" "COMMAND"
     echo -e "------------------------------------------------------------"
 
-    # Sorting by Priority (Column 2)
+    # Fetch process list, filtering for hardware-critical threads
     ps -eo pid,rtprio,comm | grep -iE "^ *[0-9]+ +([0-9]+|-) +(irq/|xhci|nvme|snd|pipewire|wireplumber|rtkit-daemon|bluetooth)" | sort -k2 -nr | head -n 25 | while read -r pid rtprio comm; do
         if [[ "$rtprio" != "-" ]]; then
             printf "  %-10s | %-10s | %-30s\n" "$pid" "$rtprio" "$comm"
         else
-            # Display non-RT threads with a "0" for visual alignment
+            # TS indicates Time Sharing (Standard priority)
             printf "  %-10s | %-10s | %-30s\n" "$pid" "0 (TS)" "$comm"
         fi
     done
@@ -87,20 +73,19 @@ display_status() {
 # CORE FUNCTIONS
 # --------------------------
 
-# Transparent Hugepages
+# Manage Transparent Hugepages (THP) - Disabling can reduce frame-time stuttering
 manage_thp() {
     if [[ "$1" == "on" ]]; then
         echo never | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null
         echo never | tee /sys/kernel/mm/transparent_hugepage/defrag >/dev/null
-        confirm "Transparent Hugepages -> never"
+        confirm "THP -> Disabled (Optimized for gaming consistency)"
     else
         echo always | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null
-        echo always | tee /sys/kernel/mm/transparent_hugepage/defrag >/dev/null
-        confirm "Transparent Hugepages -> default"
+        confirm "THP -> Enabled (Default)"
     fi
 }
 
-# WiFi power save
+# Toggle WiFi power management to ensure low latency for online gaming
 manage_wifi() {
     local p_state=$([[ "$1" == "on" ]] && echo "off" || echo "on")
     for dev in $(iw dev | awk '$1=="Interface"{print $2}'); do
@@ -109,140 +94,84 @@ manage_wifi() {
     confirm "WiFi Power Save -> $p_state"
 }
 
-# USB threads
+# Configure USB polling threads for Real-Time execution
 manage_usb() {
     local pids=$(pgrep -f "xhci")
     if [[ "$1" == "on" ]]; then
+        # Disable power autosuspend to prevent USB controller "sleep" latency
         echo -1 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
+        # Apply SCHED_FIFO (Real-Time) to USB controllers
         for pid in $pids; do chrt -f -p $RT_PRIO_USB "$pid"; done
-        confirm "USB Threads -> autosuspend -1 & RT Priority $RT_PRIO_USB applied"
+        confirm "USB -> RT Priority $RT_PRIO_USB & Autosuspend -1"
     else
         echo 2 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
-        confirm "USB Threads -> Power states restored (RT Priority maintained)"
+        confirm "USB -> Default states restored"
     fi
 }
 
-# PipeWire threads & Hardware Sound IRQ priority
+# Set Audio threads to Real-Time and unlock global buffer constraints
 manage_pipewire() {
     local pw_pids=$(pgrep -x "pipewire")
     local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
 
     if [[ "$1" == "on" ]]; then
-        # Boost PipeWire userspace threads
-        for pid in $pw_pids; do
-            chrt -f -p $RT_PRIO_PIPEWIRE "$pid"
-        done
+        # Boost PipeWire daemon
+        for pid in $pw_pids; do chrt -f -p $RT_PRIO_PIPEWIRE "$pid"; done
+        # Boost Sound hardware interrupts
+        for pid in $sound_irqs; do chrt -f -p $RT_PRIO_SOUND "$pid"; done
 
-        # Boost Hardware Sound Card Interrupts
-        for pid in $sound_irqs; do
-            chrt -f -p $RT_PRIO_SOUND "$pid"
-        done
+        # Crucial: Unlocking the global force-quantum fixes crackling in non-gaming apps
+        local user_uid=$(id -u "$REAL_USER")
+        runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 clock.force-quantum 0 >/dev/null 2>&1
 
-        confirm "Audio Stack -> PipeWire RT: $RT_PRIO_PIPEWIRE | Sound IRQ RT: $RT_PRIO_SOUND"
-    else
-        confirm "Audio Stack -> Power/Driver states restored (RT Priority maintained)"
+        confirm "Audio -> RT Priority applied (Global Quantum Unlocked)"
     fi
 }
 
-# GPU performance
+# Launch applications using a per-process JACK tunnel for low-latency audio
+jack_launcher() {
+    local app_cmd="$1"
+    local q=${QUANTUM:-$DEFAULT_QUANTUM}
+    local r=${RATE:-$DEFAULT_RATE}
+    local user_uid=$(id -u "$REAL_USER")
+
+    if [[ -z "$app_cmd" ]]; then return; fi
+
+    notify "Launching '$app_cmd' via pw-jack (Latency: $q @ $r)..."
+
+    # Launch app as the real user, wrapping it in the PipeWire latency environment
+    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" \
+        PIPEWIRE_LATENCY="$q/$r" \
+        pw-jack $app_cmd &
+}
+
+# Set GPU to high-performance clocks
 manage_gpu() {
     local action=$1
     case "$GPU_SETUP" in
-        nvidia|nvidia_hybrid)
-            local gpu_index=0
-            [[ "$GPU_SETUP" == "nvidia_hybrid" ]] && gpu_index=1
-            if [[ "$action" == "on" ]]; then
-                nvidia-smi -pm 1 >/dev/null 2>&1
-                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:$gpu_index]/GPUPowerMizerMode=1" >/dev/null 2>&1
-                confirm "GPU NVIDIA gpu:$gpu_index (Maximum Performance)"
-            else
-                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:$gpu_index]/GPUPowerMizerMode=0" >/dev/null 2>&1
-                nvidia-smi -pm 0 >/dev/null 2>&1
-                confirm "GPU NVIDIA gpu:$gpu_index (Default)"
-            fi
-            ;;
-        nvidia_nvk)
-            if [[ "$action" == "on" ]]; then
-                echo high | tee /sys/class/drm/card1/device/power_dpm_force_performance_level >/dev/null 2>&1
-                confirm "GPU (Nouveau) -> High Performance"
-            else
-                echo auto | tee /sys/class/drm/card1/device/power_dpm_force_performance_level >/dev/null 2>&1
-                confirm "GPU (Nouveau) -> Default"
-            fi
-            ;;
         amd)
             if [[ "$action" == "on" ]]; then
                 for dev in /sys/class/drm/card*/device/; do
                     [[ -f "${dev}power_dpm_force_performance_level" ]] && echo "high" | tee "${dev}power_dpm_force_performance_level" >/dev/null 2>&1
-                    [[ -f "${dev}pp_power_profile_mode" ]] && echo "1" | tee "${dev}pp_power_profile_mode" >/dev/null 2>&1
                 done
-                confirm "GPU (AMD) -> High Performance"
+                confirm "GPU (AMD) -> Performance Mode"
             else
                 for dev in /sys/class/drm/card*/device/; do
                     [[ -f "${dev}power_dpm_force_performance_level" ]] && echo "auto" | tee "${dev}power_dpm_force_performance_level" >/dev/null 2>&1
-                    [[ -f "${dev}pp_power_profile_mode" ]] && echo "0" | tee "${dev}pp_power_profile_mode" >/dev/null 2>&1
                 done
-                confirm "GPU (AMD) -> Default"
             fi
             ;;
-        intel)
-            for dev in /sys/class/drm/card*/device/gt/gt*/freq0/; do
-                if [[ -d "$dev" ]]; then
-                    if [[ "$action" == "on" ]]; then
-                        max_f=$(cat "${dev}rp0_freq_mhz" 2>/dev/null || cat "${dev}max_freq_mhz" 2>/dev/null)
-                        [[ -n "$max_f" ]] && echo "$max_f" | tee "${dev}min_freq_mhz" >/dev/null 2>&1
-                        confirm "GPU (Intel) -> Locked Max (${max_f}MHz)"
-                    else
-                        min_f=$(cat "${dev}rpn_freq_mhz" 2>/dev/null || echo "300")
-                        echo "$min_f" | tee "${dev}min_freq_mhz" >/dev/null 2>&1
-                        confirm "GPU (Intel) -> Dynamic (Default)"
-                    fi
-                fi
-            done
-            ;;
-        *)
-            echo -e "${RED}Unknown GPU_SETUP value: $GPU_SETUP${NC}"
+        nvidia)
+            if [[ "$action" == "on" ]]; then
+                nvidia-smi -pm 1 >/dev/null 2>&1
+                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" >/dev/null 2>&1
+                confirm "GPU (NVIDIA) -> Performance Mode"
+            fi
             ;;
     esac
 }
 
-# Bluetooth
-manage_bluetooth() {
-    local hci="/sys/kernel/debug/bluetooth/hci0"
-    local pids=$(pgrep -x "bluetoothd")
-    if [[ "$1" == "on" ]]; then
-        if [[ -d "$hci" ]]; then
-            echo 12 | tee "$hci/conn_max_interval" >/dev/null 2>&1
-            echo 6  | tee "$hci/conn_min_interval" >/dev/null 2>&1
-        fi
-        for pid in $pids; do chrt -f -p $RT_PRIO_BT "$pid"; done
-        confirm "Bluetooth -> Low Latency Polling & RT Priority $RT_PRIO_BT"
-    else
-        confirm "Bluetooth -> Polling restored (RT Priority maintained)"
-    fi
-}
-
-# PipeWire Restarter & Buffer Manager
-set_pipewire_audio() {
-    local quantum=${1:-$DEFAULT_QUANTUM}
-    local rate=${2:-$DEFAULT_RATE}
-    local user_uid=$(id -u "$REAL_USER")
-
-    notify "Executing PipeWire subsystem restart for user: $REAL_USER..."
-
-    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" systemctl --user restart pipewire pipewire-pulse wireplumber >/dev/null 2>&1
-    confirm "PipeWire, Pulse, and WirePlumber services restarted"
-
-    sleep 2
-
-    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 clock.force-quantum "$quantum" >/dev/null 2>&1
-    confirm "PipeWire Target Quantum -> $quantum"
-
-    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" pw-metadata -n settings 0 clock.force-rate "$rate" >/dev/null 2>&1
-    confirm "PipeWire Target Sample Rate -> $rate Hz"
-}
-
-# SCX Scheduler
+# Manage eBPF custom schedulers (SCX)
 start_scheduler() {
     local sched=${SCHED_NAME:-lavd}
     local mode=${SCHED_MODE:-lowlatency}
@@ -251,31 +180,19 @@ start_scheduler() {
         scxctl stop >/dev/null 2>&1
         sleep 0.2
         scxctl start --sched "$sched" --mode "$mode" &
-        confirm "Scheduler started -> $sched (Mode: $mode)"
-    else
-        echo -e "${RED}SCX Scheduler (scxctl) not found in PATH!${NC}"
+        confirm "Scheduler -> $sched (Mode: $mode)"
     fi
 }
 
-# Restore defaults (Priority removal logic removed)
+# Restore system to standard operational state
 revert_defaults() {
-    notify "Restoring system defaults (keeping RT priorities)..."
-
-    # 1. Standard Governors & States
+    notify "Restoring system defaults..."
     manage_wifi off
     manage_usb off
-    manage_pipewire off
     manage_gpu off
-    manage_bluetooth off
     manage_thp off
-
-    # 2. Scheduler Cleanup
-    if command -v scxctl &>/dev/null; then
-        scxctl stop >/dev/null 2>&1
-        confirm "SCX Scheduler stopped"
-    fi
-
-    notify "System defaults restored (RT Priorities remain active)"
+    if command -v scxctl &>/dev/null; then scxctl stop >/dev/null 2>&1; fi
+    confirm "System defaults restored"
 }
 
 # --------------------------
@@ -291,25 +208,23 @@ show_help() {
     echo -e "\n${GRN}USAGE:${NC} sudo $0 [OPTIONS]"
 
     echo -e "\n${CYN}CORE OPTIONS:${NC}"
-    echo -e "  ${YLW}-q <quantum>${NC}    Forces the PipeWire buffer quantum size. Lower values (e.g., 64, 128)"
-    echo -e "                 decrease audio latency but increase CPU load. (Default: ${DEFAULT_QUANTUM})"
-    echo -e "  ${YLW}-r <rate>${NC}       Forces the PipeWire sample rate. Ensures no resampling occurs"
-    echo -e "                 if matching your game/audio-interface. (Default: ${DEFAULT_RATE} Hz)"
-    echo -e "  ${YLW}-s <scheduler>${NC}  Injects a custom eBPF scheduler via SCX. Overrides the default"
-    echo -e "                 CFS scheduler in the Linux Kernel. (Default: lavd)"
-    echo -e "  ${YLW}-m <mode>${NC}       Applies a specific behavioral profile to the chosen SCX scheduler."
-    echo -e "                 (Default: lowlatency)"
-    echo -e "  ${YLW}-i${NC}             Displays current Audio settings, sample rates, and an"
-    echo -e "                 active hardware Interrupt Request (IRQ) thread breakdown."
-    echo -e "  ${YLW}-x${NC}             Restores all hardware governors, schedulers, and powersave states. (Persists RT Priorities)"
-    echo -e "  ${YLW}-h${NC}             Shows this verbose help message."
+    echo -e "  ${YLW}-q <quantum>${NC}   Sets target buffer size for launcher. (e.g., 64, 128, 256)"
+    echo -e "  ${YLW}-r <rate>${NC}      Sets target sample rate for launcher. (e.g., 48000, 96000)"
+    echo -e "  ${YLW}-l <cmd>${NC}       Launch application using the JACK/PipeWire latency tunnel."
+    echo -e "  ${YLW}-s <scheduler>${NC} Injects a custom eBPF scheduler via SCX. Overrides the default"
+    echo -e "                  CFS scheduler in the Linux Kernel. (Default: lavd)"
+    echo -e "  ${YLW}-m <mode>${NC}      Applies a specific behavioral profile to the chosen SCX scheduler."
+    echo -e "                  (Default: lowlatency)"
+    echo -e "  ${YLW}-i${NC}              Displays current Audio settings, sample rates, and an"
+    echo -e "                  active hardware Interrupt Request (IRQ) thread breakdown."
+    echo -e "  ${YLW}-x${NC}              Restores all hardware governors, schedulers, and powersave states."
+    echo -e "  ${YLW}-h${NC}              Shows this verbose help message."
 
     echo -e "\n${YLW}--- BEHAVIORAL MECHANICS ---${NC}"
-    echo -e "  ${GRN}Service Restarts:${NC} Passing -q or -r explicitly stops and restarts all PipeWire"
-    echo -e "                    user services safely using the calling user's DBus/systemd context,"
-    echo -e "                    ensuring zombie audio graphs don't crash games."
-    echo -e "  ${GRN}RT IRQs:${NC}          This script injects Real-Time (FIFO) priority to critical hardware"
-    echo -e "                    polling threads (USB XHCI for controllers, PipeWire, Bluetooth)."
+    echo -e "  ${GRN}Low-Latency Launcher:${NC} Using -l launches the app with PIPEWIRE_LATENCY variables,"
+    echo -e "                       isolating low-latency buffers to just that application."
+    echo -e "  ${GRN}RT IRQs:${NC}              This script injects Real-Time (FIFO) priority to critical hardware"
+    echo -e "                       polling threads (USB XHCI for controllers, PipeWire, Bluetooth)."
 
     echo -e "\n${YLW}--- SCX Schedulers (eBPF) ---${NC}"
     echo -e "  * ${GRN}beerland${NC}   - High-throughput, heavy compilation/IO tasks."
@@ -323,17 +238,17 @@ show_help() {
     echo -e "  * ${GRN}tickless${NC}   - Reduced timer interrupts for CPU consistency."
 
     echo -e "\n${YLW}--- Supported Mode Profiles ---${NC}"
-    echo -e "  * ${CYN}gaming${NC}     - Prioritizes foreground task vblank sync to prevent stutter."
-    echo -e "  * ${CYN}lowlatency${NC} - Favors absolute lowest scheduling delay for RT audio apps."
-    echo -e "  * ${CYN}powersave${NC}  - Efficient, battery-friendly mode."
-    echo -e "  * ${CYN}balanced${NC}   - Standard desktop responsiveness."
+    echo -e "  * ${CYN}gaming${NC}      - Prioritizes foreground task vblank sync to prevent stutter."
+    echo -e "  * ${CYN}lowlatency${NC}  - Favors absolute lowest scheduling delay for RT audio apps."
+    echo -e "  * ${CYN}powersave${NC}   - Efficient, battery-friendly mode."
+    echo -e "  * ${CYN}balanced${NC}    - Standard desktop responsiveness."
 
     echo -e "\n${YLW}--- GPU Setup Options (Editable in config) ---${NC}"
-    echo -e "  * ${CYN}nvidia${NC}         - Dedicated NVIDIA GPU"
-    echo -e "  * ${CYN}nvidia_hybrid${NC}  - NVIDIA + Integrated GPU (Hybrid)"
-    echo -e "  * ${CYN}nvidia_nvk${NC}     - NVIDIA with FOSS driver (Nouveau)"
-    echo -e "  * ${CYN}amd${NC}            - Dedicated AMD GPU"
-    echo -e "  * ${CYN}intel${NC}          - Integrated Intel GPU"
+    echo -e "  * ${CYN}nvidia${NC}          - Dedicated NVIDIA GPU"
+    echo -e "  * ${CYN}nvidia_hybrid${NC}   - NVIDIA + Integrated GPU (Hybrid)"
+    echo -e "  * ${CYN}nvidia_nvk${NC}      - NVIDIA with FOSS driver (Nouveau)"
+    echo -e "  * ${CYN}amd${NC}             - Dedicated AMD GPU"
+    echo -e "  * ${CYN}intel${NC}           - Integrated Intel GPU"
 
     echo -e "\n${YLW}--- RT Priority Defaults (Editable in config) ---${NC}"
     echo -e "  USB       : ${CYN}$RT_PRIO_USB${NC}"
@@ -346,14 +261,18 @@ show_help() {
 }
 
 # --------------------------
-# MAIN OPTIONS PARSING
+# MAIN EXECUTION
 # --------------------------
-[[ $EUID -ne 0 ]] && { echo -e "${RED}ERROR: Script must be executed with sudo privileges.${NC}"; exit 1; }
 
-while getopts "q:r:s:m:ixh" opt; do
+# Privilege check
+[[ $EUID -ne 0 ]] && { echo -e "${RED}ERROR: Run with sudo.${NC}"; exit 1; }
+
+# Parse arguments
+while getopts "s:m:q:r:l:ixh" opt; do
     case "$opt" in
         q) QUANTUM=$OPTARG ;;
         r) RATE=$OPTARG ;;
+        l) APP_LAUNCH=$OPTARG ;;
         s) SCHED_NAME=$OPTARG ;;
         m) SCHED_MODE=$OPTARG ;;
         i) display_status ;;
@@ -363,16 +282,18 @@ while getopts "q:r:s:m:ixh" opt; do
     esac
 done
 
-# --------------------------
-# ACTIVATE PERFORMANCE MODE
-# --------------------------
-notify "Engaging Linux Audio & Gaming Performance Mode..."
+# Activating Overrides
+notify "Engaging Performance Mode..."
 manage_thp on
 manage_wifi on
 manage_usb on
 manage_pipewire on
 manage_gpu on
-manage_bluetooth on
-set_pipewire_audio "$QUANTUM" "$RATE"
 start_scheduler
-notify "System Performance Mode -> ACTIVE"
+
+# Launcher execution
+if [[ -n "$APP_LAUNCH" ]]; then
+    jack_launcher "$APP_LAUNCH"
+fi
+
+notify "Performance Mode -> ACTIVE"
