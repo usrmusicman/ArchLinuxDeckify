@@ -274,20 +274,20 @@ GS_ARGS=(
 if [ "$EXPERIMENTAL_WAYLAND" = true ]; then
     echo "Forcing Pure Wayland Environment..."
 
-    # This is the 'Master Switch' for modern Gamescope
+    # 1. THE CRITICAL LINK: Point the app to the Gamescope socket
+    export WAYLAND_DISPLAY=gamescope-0
+
+    # 2. Tell Gamescope to expose the protocols
     GS_ARGS+=("--expose-wayland")
 
-    # We disable the XWayland server for the app if possible
-    # or set it to 0 to see if your build supports a truly headless X11 mode
+    # 3. Disable XWayland for the client payload
     GS_ARGS+=("--xwayland-count" "0")
 
-    # Force the application's toolkit to bypass X11
+    # 4. Force Toolkits to Wayland
     export SDL_VIDEODRIVER=wayland
-    export GDK_BACKEND=wayland
+    export _JAVA_AWT_WM_NONREPARENTING=1
     export QT_QPA_PLATFORM=wayland
-    export CLUTTER_BACKEND=wayland
-else
-    GS_ARGS+=("--xwayland-count" "2")
+    export GDK_BACKEND=wayland
 fi
 
 # Apply HDR if the --hdr switch was used
