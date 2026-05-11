@@ -309,13 +309,13 @@ if [[ -x "$BIN_PATH" ]]; then
     if [[ "$BIN_PATH" == "/usr/bin/steam" ]]; then
         # Steam still requires XWayland for many web-views and older games,
         # so we keep it for Steam.
-        exec gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
+        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
     else
         # FOR RETROARCH / NATIVE APPS:
         # We run gamescope WITHOUT the --xwayland-count or X11 specific flags
         # if your version supports --backend wayland, add it here.
 
-        exec gamescope \
+        exec dbus-run-session -- gamescope \
             -W "$SCREENWIDTH" \
             -H "$SCREENHEIGHT" \
             -r "$REFRESHRATE" \
