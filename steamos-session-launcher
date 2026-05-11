@@ -14,7 +14,6 @@
 
 # Default values
 ENABLE_HDR=false
-EXPERIMENTAL_WAYLAND=false # Experimental toggle
 TARGET_CMD=""
 
 # CLI Switch Logic
@@ -24,17 +23,20 @@ while [[ "$#" -gt 0 ]]; do
             ENABLE_HDR=true
             shift
             ;;
-        --wayland-native) # New experimental flag
-            EXPERIMENTAL_WAYLAND=true
-            shift
-            ;;
         --run)
+            # Shift past the --run flag
             shift
-            [[ -n "$*" ]] && TARGET_CMD="$*"
+            # Capture every remaining argument as the command to execute.
+            if [[ -n "$*" ]]; then
+                TARGET_CMD="$*"
+            fi
+            # Break is essential here so the script doesn't try to
+            # parse the game's own flags as script flags.
             break
             ;;
         *)
             echo "Unknown parameter: $1"
+            echo "Usage: $0 [--hdr] --run <binary path> [args]"
             exit 1
             ;;
     esac
@@ -268,27 +270,8 @@ GS_ARGS=(
   "--sharpness" "$SHARPNESS"
   "--mangoapp"              # Performance overlay support
   "--steam"                 # Integration with Steam UI
+  "--xwayland-count" "2"    # Extra instance for overlay stability
 )
-
-# In the GS_ARGS section, update the Wayland block:
-if [ "$EXPERIMENTAL_WAYLAND" = true ]; then
-    echo "Forcing Pure Wayland Environment..."
-
-    # 1. THE CRITICAL LINK: Point the app to the Gamescope socket
-    export WAYLAND_DISPLAY=gamescope-0
-
-    # 2. Tell Gamescope to expose the protocols
-    GS_ARGS+=("--expose-wayland")
-
-    # 3. Disable XWayland for the client payload
-    GS_ARGS+=("--xwayland-count" "0")
-
-    # 4. Force Toolkits to Wayland
-    export SDL_VIDEODRIVER=wayland
-    export _JAVA_AWT_WM_NONREPARENTING=1
-    export QT_QPA_PLATFORM=wayland
-    export GDK_BACKEND=wayland
-fi
 
 # Apply HDR if the --hdr switch was used
 if [ "$ENABLE_HDR" = true ]; then
@@ -323,11 +306,23 @@ if [[ -x "$BIN_PATH" ]]; then
     # Note: Modern Gamescope uses --xwayland by default.
     # To go Wayland-only, we avoid flags that trigger Xwayland.
 
-    # Execute within the dbus-run-session as discussed for TTY stability
-    if [[ "$BIN_PATH" == *"/steam" ]]; then
-        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
+    if [[ "$BIN_PATH" == "/usr/bin/steam" ]]; then
+        # Steam still requires XWayland for many web-views and older games,
+        # so we keep it for Steam.
+        exec gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
     else
-        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- $TARGET_CMD
+        # FOR RETROARCH / NATIVE APPS:
+        # We run gamescope WITHOUT the --xwayland-count or X11 specific flags
+        # if your version supports --backend wayland, add it here.
+
+        exec gamescope \
+            -W "$SCREENWIDTH" \
+            -H "$SCREENHEIGHT" \
+            -r "$REFRESHRATE" \
+            -f \
+            --force-grab-cursor \
+            --grab \
+            -- $TARGET_CMD
     fi
 else
     echo "Error: Binary '$BIN_PATH' not found."
