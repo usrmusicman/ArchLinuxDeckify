@@ -12,6 +12,11 @@
 # 1. INITIALIZATION & ARGUMENT PARSING
 # ------------------------------------------------------------------------------
 
+# Check if TERM variable is empty and then set it.
+if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
+    export TERM=linux
+fi
+
 # Default values
 ENABLE_HDR=false
 TARGET_CMD=""
@@ -318,15 +323,7 @@ if [[ -x "$BIN_PATH" ]]; then
         # FOR RETROARCH / NATIVE APPS:
         # We run gamescope WITHOUT the --xwayland-count or X11 specific flags
         # if your version supports --backend wayland, add it here.
-
-        exec dbus-run-session -- gamescope \
-            -W "$SCREENWIDTH" \
-            -H "$SCREENHEIGHT" \
-            -r "$REFRESHRATE" \
-            -f \
-            --force-grab-cursor \
-            --grab \
-            -- $TARGET_CMD
+        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
     fi
 else
     echo "Error: Binary '$BIN_PATH' not found."
