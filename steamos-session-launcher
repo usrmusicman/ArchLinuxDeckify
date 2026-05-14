@@ -78,9 +78,6 @@ export XDG_CURRENT_DESKTOP=gamescope
 # Clear The Screen
 clear
 
-# Mask Getty TTY6 service
-sudo /usr/bin/systemctl mask getty@tty6.service
-
 # ------------------------------------------------------------------------------
 # 2. HARDWARE MODULES
 # ------------------------------------------------------------------------------
