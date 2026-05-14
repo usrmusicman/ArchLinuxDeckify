@@ -36,10 +36,6 @@ RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-90} # Priority for PipeWire audio daemon
 RT_PRIO_BT=${RT_PRIO_BT:-85}        # Priority for Bluetooth kernel threads
 RT_PRIO_SOUND=${RT_PRIO_SOUND:-80}   # Priority for Sound Card hardware interrupts
 
-# Launcher defaults for pw-jack
-DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-1024}
-DEFAULT_RATE=${DEFAULT_RATE:-48000}
-
 # --------------------------
 # SYSTEM STATUS MODULE (-i)
 # --------------------------
@@ -151,23 +147,6 @@ manage_usb() {
     fi
 }
 
-# Launch applications using a per-process JACK tunnel for low-latency audio
-jack_launcher() {
-    local app_cmd="$1"
-    local q=${QUANTUM:-$DEFAULT_QUANTUM}
-    local r=${RATE:-$DEFAULT_RATE}
-    local user_uid=$(id -u "$REAL_USER")
-
-    if [[ -z "$app_cmd" ]]; then return; fi
-
-    notify "Launching '$app_cmd' via pw-jack (Latency: $q @ $r)..."
-
-    # Launch app as the real user, wrapping it in the PipeWire latency environment
-    runuser -u "$REAL_USER" -- env XDG_RUNTIME_DIR="/run/user/$user_uid" \
-        PIPEWIRE_LATENCY="$q/$r" \
-        pw-jack $app_cmd &
-}
-
 # Set GPU to high-performance clocks
 manage_gpu() {
     local action=$1
@@ -231,9 +210,6 @@ show_help() {
     echo -e "\n${GRN}USAGE:${NC} sudo $0 [OPTIONS]"
 
     echo -e "\n${CYN}CORE OPTIONS:${NC}"
-    echo -e "  ${YLW}-q <quantum>${NC}   Sets target buffer size for launcher. (e.g., 64, 128, 256)"
-    echo -e "  ${YLW}-r <rate>${NC}      Sets target sample rate for launcher. (e.g., 48000, 96000)"
-    echo -e "  ${YLW}-l <cmd>${NC}       Launch application using the JACK/PipeWire latency tunnel."
     echo -e "  ${YLW}-s <scheduler>${NC} Injects a custom eBPF scheduler via SCX. Overrides the default"
     echo -e "                  CFS scheduler in the Linux Kernel. (Default: lavd)"
     echo -e "  ${YLW}-m <mode>${NC}      Applies a specific behavioral profile to the chosen SCX scheduler."
@@ -313,10 +289,5 @@ manage_soundcards on
 manage_usb on
 manage_gpu on
 start_scheduler
-
-# Launcher execution
-if [[ -n "$APP_LAUNCH" ]]; then
-    jack_launcher "$APP_LAUNCH"
-fi
 
 notify "Performance Mode -> ACTIVE"
