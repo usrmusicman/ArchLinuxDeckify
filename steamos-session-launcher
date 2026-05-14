@@ -75,6 +75,12 @@ export XDG_SESSION_TYPE=wayland
 export SDL_VIDEODRIVER=wayland
 export XDG_CURRENT_DESKTOP=gamescope
 
+# Clear The Screen
+clear
+
+# Mask Getty TTY6 service
+sudo /usr/bin/systemctl mask getty@tty6.service
+
 # ------------------------------------------------------------------------------
 # 2. HARDWARE MODULES
 # ------------------------------------------------------------------------------
@@ -219,33 +225,33 @@ module_mesa_generic() {
 case "$GPU_SETUP" in
   "amd")
     module_amd
-    #sleep 3
+    clear
     ;;
   "intel")
     module_intel
-    #sleep 3
+    clear
     ;;
   "nvidia")
     # Proprietary Desktop Case
     module_nvidia_core
     module_nvidia_proprietary_extras
-    #sleep 3
+    clear
     ;;
   "nvidia_hybrid")
     # Proprietary Laptop/Optimus Case (Shares Core)
     module_nvidia_core
     module_nvidia_hybrid_extras
-    #sleep 3
+    clear
     ;;
   "nvidia_nvk")
     # Open Source Case
     module_nvidia_nvk
-    #sleep 3
+    clear
     ;;
   *)
     # Fallback for LLVMpipe or unknown hardware
     module_mesa_generic
-    #sleep 3
+    clear
     ;;
 esac
 
@@ -300,7 +306,8 @@ export GDK_BACKEND=wayland
 
 # Check if the binary is executable
 if [[ -x "$BIN_PATH" ]]; then
-    echo "Launching Pure Wayland Session..."
+
+    echo "Launching SteamOS Session..."
 
     # If you want to disable the XWayland server entirely in Gamescope:
     # Note: Modern Gamescope uses --xwayland by default.

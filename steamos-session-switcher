@@ -18,6 +18,3 @@ sudo /usr/bin/systemctl unmask getty@tty6.service
 # 3. Force the switch to TTY6 and start a login shell
 # The login shell will trigger the logic in .bash_profile
 sudo /usr/bin/openvt -c 6 -s -f -u "$REAL_USER" -- /bin/bash -l
-
-# 2. Mask Getty TTY6 service
-sudo /usr/bin/systemctl mask getty@tty6.service

@@ -49,6 +49,7 @@ if [[ "$(tty)" == "/dev/tty6" && -f /tmp/game_session_target ]]; then
     # Launch SteamOS Session
     clear
     sudo $STEAMOS_GAMEMODE -s lavd -m gaming
+    clear
     $STEAMOS_SESSION_LAUNCHER --run "$SESSION_BINARY"
 
     # Exit SteamOS Session
@@ -69,7 +70,9 @@ if [[ "$(tty)" == "/dev/tty6" && -f /tmp/game_session_target ]]; then
         echo "Display manager not supported"
     fi
 
+    # Final Stage And Cleanup Of Session
     unset SESSION_BINARY
+    clear
     logout
 
 fi
