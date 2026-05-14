@@ -5,5 +5,5 @@ Name=SteamOS Gaming Mode
 Exec=/opt/steamos-session/steamos-session-switcher /usr/bin/steam
 Icon=/usr/share/icons/distributor-logo-steamdeck.svg
 Terminal=false
-Categories=Games;
+Categories=Game
 StartupNotify=true
