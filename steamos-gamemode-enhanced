@@ -94,6 +94,19 @@ manage_wifi() {
     confirm "WiFi Power Save -> $p_state"
 }
 
+manage_pipewire() {
+    # Boost Software Daemons (PipeWire Stack)
+    if [[ "$1" == "on" ]]; then
+        local sw_pids=$(pgrep -u "$REAL_USER" -x "pipewire|wireplumber|pipewire-pulse")
+        if [[ -n "$sw_pids" ]]; then
+            for pid in $sw_pids; do
+                chrt -f -p "$RT_PRIO_PIPEWIRE" "$pid" 2>/dev/null
+            done
+            confirm "Audio Stack -> Software RT Priority $RT_PRIO_PIPEWIRE Applied"
+        fi
+    fi
+}
+
 manage_soundcards() {
     # Identify PIDs for Intel HDA and AMD ACP (onboard audio controllers)
     local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
@@ -295,6 +308,7 @@ done
 notify "Engaging Performance Mode..."
 manage_thp on
 manage_wifi on
+manage_pipewire on
 manage_soundcards on
 manage_usb on
 manage_gpu on
