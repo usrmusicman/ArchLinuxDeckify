@@ -37,7 +37,7 @@ RT_PRIO_BT=${RT_PRIO_BT:-85}        # Priority for Bluetooth kernel threads
 RT_PRIO_SOUND=${RT_PRIO_SOUND:-80}   # Priority for Sound Card hardware interrupts
 
 # Launcher defaults for pw-jack
-DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-256}
+DEFAULT_QUANTUM=${DEFAULT_QUANTUM:-1024}
 DEFAULT_RATE=${DEFAULT_RATE:-48000}
 
 # --------------------------
