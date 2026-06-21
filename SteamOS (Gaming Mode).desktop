@@ -1,9 +1,0 @@
-#!/usr/bin/env xdg-open
-[Desktop Entry]
-Type=Application
-Name=SteamOS Gaming Mode
-Exec=/opt/steamos-session/steamos-session-switcher /usr/bin/steam
-Icon=/usr/share/icons/distributor-logo-steamdeck.svg
-Terminal=false
-Categories=Game;Emulator;
-StartupNotify=true
