@@ -17,62 +17,30 @@ export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session-launcher"
 #### EXPERIMENTAL ###
 
 # rusticl specific
-#export RUSTICL_ENABLE=  # 'iris' for Intel / 'radeonsi' for AMD / "nvk" for Nvidia using nvk+nouveau 
+#export RUSTICL_ENABLE=nvk  # 'iris' for Intel / 'radeonsi' for AMD / "nvk" for Nvidia using nvk+nouveau
 #export OCL_ICD_VENDORS=rusticl.icd
 
 # ------------------------------------------------
 # Session Logic
 # ------------------------------------------------
 
-# Logic for SteamOS gaming mode triggered by the switcher script
-if [[ "$(tty)" == "/dev/tty6" && -f /tmp/game_session_target ]]; then
+# --- Start of SteamOS Session (Gamescope) ---
 
-    # Read the binary and clean up the temp file immediately to prevent loops
-    SESSION_BINARY=$(cat /tmp/game_session_target)
-    rm /tmp/game_session_target
+# Launch SteamOS Session
+clear
+sudo $STEAMOS_GAMEMODE -s lavd -m gaming
+clear
+$STEAMOS_SESSION_LAUNCHER
 
-    # --- Start of SteamOS Session (Gamescope) ---
+# Exit SteamOS Session
+clear
+sudo $STEAMOS_GAMEMODE -x
+clear
 
-    # Stop Plasma
-    if [[ -x "/usr/bin/gdm" ]]; then
-        sudo /usr/bin/systemctl stop gdm.service
-    elif [[ -x "/usr/bin/lightdm" ]]; then
-        sudo /usr/bin/systemctl stop lightdm.service
-    elif [[ -x "/usr/bin/plasmalogin" ]]; then
-        sudo /usr/bin/systemctl stop plasmalogin.service
-    elif [[ -x "/usr/bin/sddm" ]]; then
-        sudo /usr/bin/systemctl stop sddm.service
-    else
-        echo "Display manager not supported"
-    fi
+# Return to a Plasma KDE session
+exec dbus-run-session startplasma-wayland
 
-    # Launch SteamOS Session
-    clear
-    sudo $STEAMOS_GAMEMODE -s lavd -m gaming
-    clear
-    $STEAMOS_SESSION_LAUNCHER --run "$SESSION_BINARY"
-
-    # Exit SteamOS Session
-    clear
-    sudo $STEAMOS_GAMEMODE -x
-    clear
-
-    # Start of Plasma
-    if [[ -x "/usr/bin/gdm" ]]; then
-        sudo /usr/bin/systemctl start gdm.service
-    elif [[ -x "/usr/bin/lightdm" ]]; then
-        sudo /usr/bin/systemctl start lightdm.service
-    elif [[ -x "/usr/bin/plasmalogin" ]]; then
-        sudo /usr/bin/systemctl start plasmalogin.service
-    elif [[ -x "/usr/bin/sddm" ]]; then
-        sudo /usr/bin/systemctl start sddm.service
-    else
-        echo "Display manager not supported"
-    fi
-
-    # Final Stage And Cleanup Of Session
-    unset SESSION_BINARY
-    clear
-    logout
-
-fi
+# Final Stage And Cleanup Of Session
+unset SESSION_BINARY
+clear
+sudo /usr/bin/systemctl restart getty@tty1.service
