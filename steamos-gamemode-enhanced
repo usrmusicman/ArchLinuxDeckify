@@ -31,10 +31,10 @@ fi
 # DEFAULTS
 # --------------------------
 GPU_SETUP=${GPU_SETUP:-generic}
-RT_PRIO_USB=${RT_PRIO_USB:-95}       # Priority for USB host controllers (Controllers/Mice)
-RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-90} # Priority for PipeWire audio daemon
-RT_PRIO_BT=${RT_PRIO_BT:-85}        # Priority for Bluetooth kernel threads
-RT_PRIO_SOUND=${RT_PRIO_SOUND:-80}   # Priority for Sound Card hardware interrupts
+RT_PRIO_USB=${RT_PRIO_USB:-90}       # Priority for USB host controllers (Controllers/Mice)
+RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-85} # Priority for PipeWire audio daemon
+RT_PRIO_BT=${RT_PRIO_BT:-80}        # Priority for Bluetooth kernel threads
+RT_PRIO_SOUND=${RT_PRIO_SOUND:-75}   # Priority for Sound Card hardware interrupts
 
 # --------------------------
 # SYSTEM STATUS MODULE (-i)
@@ -105,7 +105,7 @@ manage_pipewire() {
 
 manage_soundcards() {
     # Identify PIDs for Intel HDA and AMD ACP (onboard audio controllers)
-    local sound_irqs=$(pgrep -f "snd_hda_intel|snd_acp")
+    local sound_irqs=$(pgrep -f "irq/.*(snd_hda_intel|snd_acp)")
 
     if [[ "$1" == "on" ]]; then
         # Check if any PIDs were actually found to avoid empty loop errors
@@ -264,6 +264,9 @@ show_help() {
 
 # Privilege check
 [[ $EUID -ne 0 ]] && { echo -e "${RED}ERROR: Run with sudo.${NC}"; exit 1; }
+
+# This ensures that even if the script crashes or is killed, defaults return.
+trap revert_defaults SIGINT SIGTERM
 
 # Parse arguments
 while getopts "s:m:q:r:l:ixh" opt; do

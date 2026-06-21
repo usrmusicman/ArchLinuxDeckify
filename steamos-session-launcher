@@ -17,36 +17,6 @@ if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
     export TERM=linux
 fi
 
-# Default values
-ENABLE_HDR=false
-TARGET_CMD=""
-
-# CLI Switch Logic
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        --hdr)
-            ENABLE_HDR=true
-            shift
-            ;;
-        --run)
-            # Shift past the --run flag
-            shift
-            # Capture every remaining argument as the command to execute.
-            if [[ -n "$*" ]]; then
-                TARGET_CMD="$*"
-            fi
-            # Break is essential here so the script doesn't try to
-            # parse the game's own flags as script flags.
-            break
-            ;;
-        *)
-            echo "Unknown parameter: $1"
-            echo "Usage: $0 [--hdr] --run <binary path> [args]"
-            exit 1
-            ;;
-    esac
-done
-
 # Define Steam-specific command flags
 # We only use this if SESSION_BINARY ends up being steam
 STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
@@ -74,11 +44,6 @@ export PROTON_USE_WOW64=1
 
 # Enable the use of the new WINENTSYNC implementation to reduce loading and streaming overhead
 export WINENTSYNC=1
-
-# SESSION TYPE SETTINGS
-export XDG_SESSION_TYPE=wayland
-export SDL_VIDEODRIVER=wayland
-export XDG_CURRENT_DESKTOP=gamescope
 
 # Clear The Screen
 clear
@@ -281,51 +246,18 @@ GS_ARGS=(
   "--xwayland-count" "2"    # Extra instance for overlay stability
 )
 
-# Apply HDR if the --hdr switch was used
-if [ "$ENABLE_HDR" = true ]; then
-  # Enables 10-bit/HDR metadata pass-through to the display
-  GS_ARGS+=("--hdr-enabled")
-fi
-
 # ------------------------------------------------------------------------------
 # 5. FINAL LAUNCH (PURE WAYLAND MODE)
 # ------------------------------------------------------------------------------
-
-# Verify we have a command
-if [[ -z "$TARGET_CMD" ]]; then
-    echo "Error: No command specified."
-    exit 1
-fi
-
-# Extract binary
-BIN_PATH=$(echo "$TARGET_CMD" | awk '{print $1}')
 
 # Force the application to use Wayland backends
 export SDL_VIDEODRIVER=wayland
 export _JAVA_AWT_WM_NONREPARENTING=1
 export QT_QPA_PLATFORM=wayland
 export GDK_BACKEND=wayland
+export XDG_CURRENT_DESKTOP=gamescope
+export XDG_SESSION_TYPE=wayland
 
-# Check if the binary is executable
-if [[ -x "$BIN_PATH" ]]; then
-
-    echo "Launching SteamOS Session..."
-
-    # If you want to disable the XWayland server entirely in Gamescope:
-    # Note: Modern Gamescope uses --xwayland by default.
-    # To go Wayland-only, we avoid flags that trigger Xwayland.
-
-    if [[ "$BIN_PATH" == "/usr/bin/steam" ]]; then
-        # Steam still requires XWayland for many web-views and older games,
-        # so we keep it for Steam.
-        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
-    else
-        # FOR RETROARCH / NATIVE APPS:
-        # We run gamescope WITHOUT the --xwayland-count or X11 specific flags
-        # if your version supports --backend wayland, add it here.
-        exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- "$BIN_PATH" $STEAMOS_FLAGS
-    fi
-else
-    echo "Error: Binary '$BIN_PATH' not found."
-    exit 1
-fi
+# Steam still requires XWayland for many web-views and older games,
+# so we keep it for Steam.
+exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS
