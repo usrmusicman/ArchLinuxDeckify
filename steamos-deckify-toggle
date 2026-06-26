@@ -1,28 +1,38 @@
 #!/bin/env bash
 
+BASEDIR="/opt/steamos-session"
+
 if [[ "$1" == "--deckify" ]]; then
-	cp config/.bash_profile.deckify ${HOME}/.bash_profile
+	cp ${BASEDIR}/config/.bash_profile.deckify ${HOME}/.bash_profile
 	if [[ -x "/usr/bin/plasmalogin" ]]; then
-		pkexec systemctl enable --now plasmalogin.service
+		sudo systemctl mask plasmalogin.service
+		systemctl reboot
 	elif [[ -x "/usr/bin/gdm" ]]; then
-		pkexec systemctl enable --now gdm.service
+		sudo systemctl mask gdm.service
+		systemctl reboot
 	elif [[ -x "/usr/bin/lightdm" ]]; then
-		pkexec systemctl enable --now lightdm.service
+		sudo systemctl mask lightdm.service
+		systemctl reboot
 	elif [[ -x "/usr/bin/sddm" ]]; then
-		pkexec systemctl enable --now sddm.service
+		sudo systemctl mask sddm.service
+		systemctl reboot
 	else
 		echo -e "Display session manager not supported"
 	fi
 elif [[ "$1" == "--normal" ]]; then
-	cp config/.bash_profile.normal ${HOME}/.bash_profile
+	cp ${BASEDIR}/config/.bash_profile.normal ${HOME}/.bash_profile
 	if [[ -x "/usr/bin/plasmalogin" ]]; then
-		pkexec systemctl disable --now plasmalogin.service
+		sudo systemctl unmask plasmalogin.service
+		systemctl reboot
 	elif [[ -x "/usr/bin/gdm" ]]; then
-		pkexec systemctl disable --now gdm.service
+		sudo systemctl unmask gdm.service
+		systemctl reboot
 	elif [[ -x "/usr/bin/lightdm" ]]; then
-		pkexec systemctl disable --now lightdm.service
+		sudo systemctl unmask lightdm.service
+		systemctl reboot
 	elif [[ -x "/usr/bin/sddm" ]]; then
-		pkexec systemctl disable --now sddm.service
+		sudo systemctl unmask sddm.service
+		systemctl reboot
 	else
 		echo -e "Display session manager not supported"
 	fi
