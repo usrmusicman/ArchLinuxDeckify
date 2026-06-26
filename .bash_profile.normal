@@ -1,0 +1,13 @@
+#
+# ~/.bash_profile
+#
+
+[[ -f ~/.bashrc ]] && . ~/.bashrc
+
+# ~/.bash_profile   (or append to ~/.profile if you use that instead)
+
+#### EXPERIMENTAL ###
+
+# rusticl specific
+#export RUSTICL_ENABLE=nvk  # 'iris' for Intel / 'radeonsi' for AMD / "nvk" for Nvidia using nvk+nouveau
+#export OCL_ICD_VENDORS=rusticl.icd

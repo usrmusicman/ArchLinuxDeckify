@@ -1,0 +1,37 @@
+#!/bin/env bash
+
+if [[ "$1" == "--deckify" ]]; then
+	cp config/.bash_profile.deckify ${HOME}/.bash_profile
+	if [[ -x "/usr/bin/plasmalogin" ]]; then
+		pkexec systemctl enable --now plasmalogin.service
+	elif [[ -x "/usr/bin/gdm" ]]; then
+		pkexec systemctl enable --now gdm.service
+	elif [[ -x "/usr/bin/lightdm" ]]; then
+		pkexec systemctl enable --now lightdm.service
+	elif [[ -x "/usr/bin/sddm" ]]; then
+		pkexec systemctl enable --now sddm.service
+	else
+		echo -e "Display session manager not supported"
+	fi
+elif [[ "$1" == "--normal" ]]; then
+	cp config/.bash_profile.normal ${HOME}/.bash_profile
+	if [[ -x "/usr/bin/plasmalogin" ]]; then
+		pkexec systemctl disable --now plasmalogin.service
+	elif [[ -x "/usr/bin/gdm" ]]; then
+		pkexec systemctl disable --now gdm.service
+	elif [[ -x "/usr/bin/lightdm" ]]; then
+		pkexec systemctl disable --now lightdm.service
+	elif [[ -x "/usr/bin/sddm" ]]; then
+		pkexec systemctl disable --now sddm.service
+	else
+		echo -e "Display session manager not supported"
+	fi
+elif [[ "$1" == "--help" ]]; then
+	echo -e "SteamOS Deckify Toggle"
+	echo -e ""
+	echo -e "--deckify: Toggle the steamdeck console setup"
+	echo -e "--normal: Toggle normal install without the gamemode console boot sequence"
+	echo -e "--help: Show this help message"
+else
+	echo -e "Please type in a valid option, use --help for more details"
+fi
