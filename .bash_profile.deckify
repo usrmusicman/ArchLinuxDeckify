@@ -26,21 +26,13 @@ export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session-launcher"
 
 # --- Start of SteamOS Session (Gamescope) ---
 
-# Launch SteamOS Session
-clear
-sudo $STEAMOS_GAMEMODE -s lavd -m gaming
-clear
-$STEAMOS_SESSION_LAUNCHER
-
-# Exit SteamOS Session
-clear
-sudo $STEAMOS_GAMEMODE -x
-clear
-
-# Return to a Plasma KDE session
-exec dbus-run-session startplasma-wayland
-
-# Final Stage And Cleanup Of Session
-unset SESSION_BINARY
-clear
-sudo /usr/bin/systemctl restart getty@tty1.service
+if [ "$(tty)" = "/dev/tty1" ]; then
+	# Launch SteamOS Session
+	sudo $STEAMOS_GAMEMODE -s lavd -m gaming
+	sleep 2
+	clear
+	$STEAMOS_SESSION_LAUNCHER
+	unset SESSION_BINARY
+	clear
+	exit
+fi
