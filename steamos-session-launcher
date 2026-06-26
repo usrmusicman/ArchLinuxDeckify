@@ -235,7 +235,6 @@ GS_ARGS=(
   "--sharpness" "$SHARPNESS"
   "--mangoapp"              # Performance overlay support
   "--steam"                 # Integration with Steam UI
-  "--xwayland-count" "2"    # Extra instance for overlay stability
 )
 
 # ------------------------------------------------------------------------------
