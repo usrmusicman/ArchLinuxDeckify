@@ -74,8 +74,6 @@ module_amd() {
   # Persistent disk cache for shaders to reduce load times.
   export RADV_SHADER_CACHE=1
 
-  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
-
   echo -e "${RED}Now Using AMD GPU Optimizations...${NC}"
 }
 
@@ -93,8 +91,6 @@ module_intel() {
 
   # Disables internal measurement overhead for pure execution speed.
   export INTEL_MEASURE=0
-
-  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/intel_icd.x86_64.json"
 
   echo -e "${BLUE}Now Using Intel GPU Optimizations...${NC}"
 }
@@ -118,8 +114,6 @@ module_nvidia_core() {
 
   # Pure 64-bit library pathing for 2026 hardware performance.
   export PROTON_NVIDIA_LIBS_NO_32BIT=1
-
-  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nvidia_icd.json"
 }
 
 # --- NVIDIA DESKTOP/PROPRIETARY EXTRAS ---
@@ -172,8 +166,6 @@ module_nvidia_nvk() {
   # GPL support is experimental but essential to avoid NVK shader stutter.
   export NVK_PERFTEST=gpl
   export mesa_glthread=true
-
-  export VK_ICD_FILENAMES="/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json"
 
   echo -e "${YELLOW}Now Using Nvidia GPU with nouveau Optimizations...${NC}"
 }
