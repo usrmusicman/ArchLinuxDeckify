@@ -4,46 +4,14 @@ BASEDIR="/opt/steamos-session"
 
 if [[ "$1" == "--deckify" ]]; then
 	cp ${BASEDIR}/config/.bash_profile.deckify ${HOME}/.bash_profile
-	if [[ -x "/usr/bin/plasmalogin" ]]; then
-		sudo systemctl mask plasmalogin.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/gdm" ]]; then
-		sudo systemctl mask gdm.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/lightdm" ]]; then
-		sudo systemctl mask lightdm.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/sddm" ]]; then
-		sudo systemctl mask sddm.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	else
-		echo -e "Display session manager not supported"
-	fi
+	sudo systemctl mask display-manager.service
+	sudo systemctl unmask getty@tty1.service
+	systemctl reboot
 elif [[ "$1" == "--normal" ]]; then
 	cp ${BASEDIR}/config/.bash_profile.normal ${HOME}/.bash_profile
-	if [[ -x "/usr/bin/plasmalogin" ]]; then
-		sudo systemctl unmask plasmalogin.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/gdm" ]]; then
-		sudo systemctl unmask gdm.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/lightdm" ]]; then
-		sudo systemctl unmask lightdm.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/sddm" ]]; then
-		sudo systemctl unmask sddm.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	else
-		echo -e "Display session manager not supported"
-	fi
+	sudo systemctl unmask display-manager.service
+	sudo systemctl mask getty@tty1.service
+	systemctl reboot
 elif [[ "$1" == "--help" ]]; then
 	echo -e "SteamOS Deckify Toggle"
 	echo -e ""
