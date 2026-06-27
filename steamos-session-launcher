@@ -74,9 +74,6 @@ module_amd() {
   # Persistent disk cache for shaders to reduce load times.
   export RADV_SHADER_CACHE=1
 
-  # Override vulkan driver used by sandboxed software
-  export MESA_LOADER_DRIVER_OVERRIDE=radv
-
   echo -e "${RED}Now Using AMD GPU Optimizations...${NC}"
 }
 
@@ -94,9 +91,6 @@ module_intel() {
 
   # Disables internal measurement overhead for pure execution speed.
   export INTEL_MEASURE=0
-
-  # Override vulkan driver used by sandboxed software
-  export MESA_LOADER_DRIVER_OVERRIDE=anv
 
   echo -e "${BLUE}Now Using Intel GPU Optimizations...${NC}"
 }
@@ -172,9 +166,6 @@ module_nvidia_nvk() {
   # GPL support is experimental but essential to avoid NVK shader stutter.
   export NVK_PERFTEST=gpl
   export mesa_glthread=true
-
-  # Override vulkan driver used by sandboxed software
-  export MESA_LOADER_DRIVER_OVERRIDE=nvk
 
   echo -e "${YELLOW}Now Using Nvidia GPU with nouveau Optimizations...${NC}"
 }
