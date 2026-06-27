@@ -39,16 +39,7 @@ if [ "$(tty)" = "/dev/tty1" ]; then
 	$STEAMOS_SESSION_LAUNCHER
 	unset SESSION_BINARY
 	clear
+	dbus-run-session $DESKTOP_AUTOLOGIN
+	clear
 	exit
-elif [ "$(tty)" = "/dev/tty2" ]; then
-	read -r -p "Do you want to run the secondary desktop session (yes/no)? " SESSION_QUESTION
-	if [ "$SESSION_QUESTION" = "yes" ]; then
-		dbus-run-session $DESKTOP_AUTOLOGIN
-		clear
-		exit
-	else
-		echo "Returning to login screen..."
-		sleep 3
-		exit
-	fi
 fi
