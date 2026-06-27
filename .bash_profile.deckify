@@ -28,6 +28,9 @@ export DESKTOP_AUTOLOGIN="startplasma-wayland"
 
 # --- Start of SteamOS Session (Gamescope) ---
 
+# Mount all removable storage
+udiskie-mount -a
+
 if [ "$(tty)" = "/dev/tty1" ]; then
 	# Launch SteamOS Session
 	sudo $STEAMOS_GAMEMODE -s lavd -m gaming
