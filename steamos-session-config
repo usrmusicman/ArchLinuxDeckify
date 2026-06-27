@@ -24,9 +24,6 @@ export RENDER_HEIGHT=1440
 # ANY OTHER VALUE USES THE GENERIC mesa drivers
 GPU_SETUP="nvidia"
 
-# GPU POWER LIMIT in Watts
-export GPU_PW_LIMIT=320 # remember to change this number in your /etc/sudoers.d/archlinuxdeckify-root-overrides file to match the value here.
-
 # Set IRQ threads up to a value 97 is acceptable
 export RT_PRIO_USB=90
 export RT_PRIO_PIPEWIRE=85
