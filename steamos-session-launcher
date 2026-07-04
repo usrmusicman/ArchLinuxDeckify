@@ -75,6 +75,7 @@ module_amd() {
   export RADV_SHADER_CACHE=1
 
   echo -e "${RED}Now Using AMD GPU Optimizations...${NC}"
+  sleep 3
 }
 
 # --- INTEL ARC/XE MODULE ---
@@ -93,6 +94,7 @@ module_intel() {
   export INTEL_MEASURE=0
 
   echo -e "${BLUE}Now Using Intel GPU Optimizations...${NC}"
+  sleep 3
 }
 
 # --- NVIDIA CORE ENGINE (Shared between Proprietary and Hybrid) ---
@@ -132,6 +134,7 @@ module_nvidia_proprietary_extras() {
   export WLR_NO_HARDWARE_CURSORS=1
 
   echo -e "${GREEN}Now Using Nvidia GPU Optimizations...${NC}"
+  sleep 3
 }
 
 # --- NVIDIA LAPTOP/HYBRID EXTRAS ---
@@ -147,6 +150,7 @@ module_nvidia_hybrid_extras() {
   export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
 
   echo -e "${TEAL}Now Using Nvidia Hybrid GPU Optimizations...${NC}"
+  sleep 3
 }
 
 # --- NVIDIA NVK (Open Source/Mesa) MODULE ---
@@ -168,6 +172,7 @@ module_nvidia_nvk() {
   export mesa_glthread=true
 
   echo -e "${YELLOW}Now Using Nvidia GPU with nouveau Optimizations...${NC}"
+  sleep 3
 }
 
 # --- GENERIC MESA MODULE ---
@@ -184,33 +189,27 @@ module_mesa_generic() {
 case "$GPU_SETUP" in
   "amd")
     module_amd
-    clear
     ;;
   "intel")
     module_intel
-    clear
     ;;
   "nvidia")
     # Proprietary Desktop Case
     module_nvidia_core
     module_nvidia_proprietary_extras
-    clear
     ;;
   "nvidia_hybrid")
     # Proprietary Laptop/Optimus Case (Shares Core)
     module_nvidia_core
     module_nvidia_hybrid_extras
-    clear
     ;;
   "nvidia_nvk")
     # Open Source Case
     module_nvidia_nvk
-    clear
     ;;
   *)
     # Fallback for LLVMpipe or unknown hardware
     module_mesa_generic
-    clear
     ;;
 esac
 
@@ -251,4 +250,4 @@ export XDG_SESSION_TYPE=wayland
 
 # Steam still requires XWayland for many web-views and older games,
 # so we keep it for Steam.
-exec dbus-run-session -- gamescope "${GS_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS
+gamescope "${GS_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS 2>/dev/null

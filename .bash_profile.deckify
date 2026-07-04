@@ -33,13 +33,12 @@ udiskie-mount -a
 
 if [ "$(tty)" = "/dev/tty1" ]; then
 	# Launch SteamOS Session
-	sudo $STEAMOS_GAMEMODE -s lavd -m gaming
-	sleep 2
 	clear
 	$STEAMOS_SESSION_LAUNCHER
+	clear
 	unset SESSION_BINARY
 	clear
-	dbus-run-session $DESKTOP_AUTOLOGIN
+	$DESKTOP_AUTOLOGIN
 	clear
 	exit
 fi
