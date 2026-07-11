@@ -17,6 +17,9 @@ if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
     export TERM=linux
 fi
 
+# SteamOS Icon Path
+STEAMOS_ICON="/opt/steamos-session/assets/icons/steamos-session-icon.png"
+
 # Define Steam-specific command flags
 # We only use this if SESSION_BINARY ends up being steam
 STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
@@ -210,7 +213,7 @@ esac
 
 # Show the SteamOS image in the tty terminal
 echo ""
-catimg ${PWD}/assets/icons/steamos-session-icon.png
+catimg $STEAMOS_ICON
 echo ""
 
 # Sleep for 3 seconds before starting Steam
