@@ -210,7 +210,7 @@ esac
 
 # Show the SteamOS image in the tty terminal
 echo ""
-catimg assets/icons/steamos-session-icon.png
+catimg ${PWD}/assets/icons/steamos-session-icon.png
 echo ""
 
 # Sleep for 3 seconds before starting Steam
