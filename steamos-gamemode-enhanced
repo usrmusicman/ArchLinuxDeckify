@@ -219,12 +219,6 @@ show_help() {
     echo -e "  ${YLW}-x${NC}              Restores all hardware governors, schedulers, and powersave states."
     echo -e "  ${YLW}-h${NC}              Shows this verbose help message."
 
-    echo -e "\n${YLW}--- BEHAVIORAL MECHANICS ---${NC}"
-    echo -e "  ${GRN}Low-Latency Launcher:${NC} Using -l launches the app with PIPEWIRE_LATENCY variables,"
-    echo -e "                       isolating low-latency buffers to just that application."
-    echo -e "  ${GRN}RT IRQs:${NC}              This script injects Real-Time (FIFO) priority to critical hardware"
-    echo -e "                       polling threads (USB XHCI for controllers, PipeWire, Bluetooth)."
-
     echo -e "\n${YLW}--- SCX Schedulers (eBPF) ---${NC}"
     echo -e "  * ${GRN}beerland${NC}   - High-throughput, heavy compilation/IO tasks."
     echo -e "  * ${GRN}bpfland${NC}    - Direct BPF, minimal scheduling overhead."
@@ -271,9 +265,6 @@ trap revert_defaults SIGINT SIGTERM
 # Parse arguments
 while getopts "s:m:q:r:l:ixh" opt; do
     case "$opt" in
-        q) QUANTUM=$OPTARG ;;
-        r) RATE=$OPTARG ;;
-        l) APP_LAUNCH=$OPTARG ;;
         s) SCHED_NAME=$OPTARG ;;
         m) SCHED_MODE=$OPTARG ;;
         i) display_status ;;

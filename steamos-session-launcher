@@ -74,8 +74,7 @@ module_amd() {
   # Persistent disk cache for shaders to reduce load times.
   export RADV_SHADER_CACHE=1
 
-  echo -e "${RED}Now Using AMD GPU Optimizations...${NC}"
-  sleep 3
+  echo -e "${RED}Starting steam with AMD GPU optimizations...${NC}"
 }
 
 # --- INTEL ARC/XE MODULE ---
@@ -93,8 +92,7 @@ module_intel() {
   # Disables internal measurement overhead for pure execution speed.
   export INTEL_MEASURE=0
 
-  echo -e "${BLUE}Now Using Intel GPU Optimizations...${NC}"
-  sleep 3
+  echo -e "${BLUE}Starting steam with Intel GPU optimizations...${NC}"
 }
 
 # --- NVIDIA CORE ENGINE (Shared between Proprietary and Hybrid) ---
@@ -133,8 +131,7 @@ module_nvidia_proprietary_extras() {
   # Fixes cursor disappearing or glitching in the Gamescope compositor.
   export WLR_NO_HARDWARE_CURSORS=1
 
-  echo -e "${GREEN}Now Using Nvidia GPU Optimizations...${NC}"
-  sleep 3
+  echo -e "${GREEN}Starting steam with Nvidia GPU optimizations...${NC}"
 }
 
 # --- NVIDIA LAPTOP/HYBRID EXTRAS ---
@@ -149,8 +146,7 @@ module_nvidia_hybrid_extras() {
   # [2026 LATENCY FIX]: Syncs the iGPU and dGPU frames to prevent "half-frame" tearing.
   export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
 
-  echo -e "${TEAL}Now Using Nvidia Hybrid GPU Optimizations...${NC}"
-  sleep 3
+  echo -e "${TEAL}Starting steam with Nvidia Hybrid GPU optimizations...${NC}"
 }
 
 # --- NVIDIA NVK (Open Source/Mesa) MODULE ---
@@ -171,15 +167,14 @@ module_nvidia_nvk() {
   export NVK_PERFTEST=gpl
   export mesa_glthread=true
 
-  echo -e "${YELLOW}Now Using Nvidia GPU with nouveau Optimizations...${NC}"
-  sleep 3
+  echo -e "${YELLOW}Starting steam with Nvidia FOSS GPU drivers and nouveau optimizations...${NC}"
 }
 
 # --- GENERIC MESA MODULE ---
 module_mesa_generic() {
   # Safe for 99% of Mesa drivers; offloads draw calls to a separate CPU thread.
   export mesa_glthread=true
-  echo -e "${MAGENTA}Now Using Generic GPU Optimizations...${NC}"
+  echo -e "${MAGENTA}Starting steam with Generic GPU Optimizations...${NC}"
 }
 
 # ------------------------------------------------------------------------------
@@ -212,6 +207,14 @@ case "$GPU_SETUP" in
     module_mesa_generic
     ;;
 esac
+
+# Show the SteamOS image in the tty terminal
+echo ""
+catimg assets/icons/steamos-session-icon.png
+echo ""
+
+# Sleep for 3 seconds before starting Steam
+sleep 3
 
 # ------------------------------------------------------------------------------
 # 4. GAMESCOPE COMPOSITOR SETUP

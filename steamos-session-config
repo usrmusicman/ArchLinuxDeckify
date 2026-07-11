@@ -30,10 +30,6 @@ export RT_PRIO_PIPEWIRE=85
 export RT_PRIO_BT=80
 export RT_PRIO_SOUND=70
 
-# Set audio session buffer and samplerate settings
-export DEFAULT_QUANTUM=1024
-export DEFAULT_RATE=48000
-
 # ------------------------------------------------
 # Common Proton / Gamescope / Steam defaults
 # ------------------------------------------------
