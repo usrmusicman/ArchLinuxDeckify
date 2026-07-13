@@ -2,6 +2,9 @@
 
 BASEDIR="/opt/steamos-session"
 
+# Set default directory for HARDWARE_CONFIG if not already set by the environment
+HARDWARE_CONFIG="${HARDWARE_CONFIG:-${BASEDIR}/config/session/hardware}"
+
 if [[ "$1" == "--deckify" ]]; then
 	cp ${BASEDIR}/config/.bash_profile.deckify ${HOME}/.bash_profile
 	if [[ -x "/usr/bin/plasmalogin" ]]; then
@@ -44,11 +47,60 @@ elif [[ "$1" == "--normal" ]]; then
 	else
 		echo -e "Display session manager not supported"
 	fi
+elif [[ "$1" == "--config" ]]; then
+	# 1. Check if a configuration argument was provided
+	if [[ -z "$2" ]]; then
+		# If given no argument, then and ONLY then list the configurations recursively
+		echo -e "Available configurations under ${HARDWARE_CONFIG}:"
+		echo -e "--------------------------------------------------"
+
+		if [[ -d "${HARDWARE_CONFIG}" ]]; then
+			# Recursively find all files, filtering only those with a bash shebang
+			find "${HARDWARE_CONFIG}" -type f -print0 | while IFS= read -r -d '' file; do
+				if head -n 1 "$file" | grep -q "bash"; then
+					echo -e "Config: $(basename "$file")"
+					echo -e "Path:   $file"
+					echo -e "--------------------------------------------------"
+				fi
+			done
+		else
+			echo -e "Error: Directory ${HARDWARE_CONFIG} does not exist."
+			exit 1
+		fi
+		exit 0
+	fi
+
+	# If an argument is given, bypass the listing completely and treat $2 as the whole path
+	CONFIG_PATH="$2"
+
+	# 2. Verify file existence at the specified full path
+	if [[ ! -f "${CONFIG_PATH}" ]]; then
+		echo -e "Error: Configuration file not found at '${CONFIG_PATH}'."
+		exit 1
+	fi
+
+	# 3. Verify that the file is a bash script by checking the first line (shebang)
+	if ! head -n 1 "${CONFIG_PATH}" | grep -q "bash"; then
+		echo -e "Error: '${CONFIG_PATH}' is not a valid bash script (missing bash shebang)."
+		exit 1
+	fi
+
+	# 4. Create symlink target directory if it doesn't exist
+	LINK_DIR="${HOME}/.local/share/steamos-session"
+	mkdir -p "${LINK_DIR}"
+
+	# 5. Generate/overwrite the symlink
+	LINK_PATH="${LINK_DIR}/steamos-session-config"
+	ln -sf "${CONFIG_PATH}" "${LINK_PATH}"
+
+	echo -e "Success: Symlink updated to point to ${CONFIG_PATH}"
+
 elif [[ "$1" == "--help" ]]; then
 	echo -e "SteamOS Deckify Toggle"
 	echo -e ""
 	echo -e "--deckify: Toggle the steamdeck console setup"
 	echo -e "--normal: Toggle normal install without the gamemode console boot sequence"
+	echo -e "--config [full_path]: Link the chosen hardware profile path (leave empty to list configs)"
 	echo -e "--help: Show this help message"
 else
 	echo -e "Please type in a valid option, use --help for more details"

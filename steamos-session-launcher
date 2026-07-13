@@ -24,192 +24,55 @@ STEAMOS_ICON="/opt/steamos-session/assets/icons/steamos-session-icon.png"
 # We only use this if SESSION_BINARY ends up being steam
 STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
 
-# Detect the actual user running the session
-REAL_USER=$(whoami)
-USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
-
-# SteamOS session config file
-# Using $USER_HOME ensures we point to the correct directory even in edge cases
-STEAMOS_SESSION_CONFIG="$USER_HOME/.config/steamos-session/steamos-session-config"
-
-# Verify the config exists before sourcing to prevent "file not found" errors
-if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
-    source "$STEAMOS_SESSION_CONFIG"
-else
-    echo "Warning: Configuration file not found at $STEAMOS_SESSION_CONFIG"
-    # Set a fallback or exit if critical
-fi
-
-# [GLOBAL]: Pure 64-bit environment for 2026 performance.
-# This eliminates 32-bit thunking overhead for modern titles.
-# NOTE: If EAC (Easy Anti-Cheat) titles fail, comment this out.
-export PROTON_USE_WOW64=1
-
-# Enable the use of the new WINENTSYNC implementation to reduce loading and streaming overhead
-export WINENTSYNC=1
-
 # Clear The Screen
 clear
 
 # ------------------------------------------------------------------------------
-# 2. HARDWARE MODULES
+# 2. DYNAMIC HARDWARE CONFIGURATION LOOKUP
 # ------------------------------------------------------------------------------
+STEAMOS_SESSION_PATH="/opt/steamos-session"
+FALLBACK_CONFIG="${HOME}/.config/steamos-session/steamos-session-config"
+PROFILE_LOADED=0
 
-# --- AMD RADEON MODULE ---
-module_amd() {
-  # RADV is the community-standard driver, vastly superior to AMDVLK for gaming.
-  export AMD_VULKAN_ICD=RADV
+# Verify our required variables are present
+if [[ -n "$OEM_HARDWARE_PROFILE" && -n "$RESOLUTION_TARGET" ]]; then
 
-  # [GPL]: Graphics Pipeline Library - Eliminates shader compilation stutter.
-  # [NGGC]: Next-Gen Geometry Culling - Hardware-level speedup for RDNA 2/3/4.
-  # [SAM]: Smart Access Memory - Direct CPU access to GPU VRAM.
-  export RADV_PERFTEST=gpl,nggc,sam
+    # Build path context: Check if we need to account for NVIDIA driver variations
+    if [[ "$OEM_HARDWARE_PROFILE" == *"nvidia"* ]]; then
+        if [[ "$NVIDIA_OFFICIAL" == "1" ]]; then
+            TARGET_CONFIG="${STEAMOS_SESSION_PATH}/config/session/hardware/${OEM_HARDWARE_PROFILE}/official/${RESOLUTION_TARGET}"
+        else
+            TARGET_CONFIG="${STEAMOS_SESSION_PATH}/config/session/hardware/${OEM_HARDWARE_PROFILE}/nouveau/${RESOLUTION_TARGET}"
+        fi
+    else
+        TARGET_CONFIG="${STEAMOS_SESSION_PATH}/config/session/hardware/${OEM_HARDWARE_PROFILE}/${RESOLUTION_TARGET}"
+    fi
 
-  # Forces 1x1 shading (Full Quality). Prevents dynamic resolution downscaling.
-  export RADV_FORCE_VRS=1
+    # Attempt to load the primary target profile
+    if [[ -f "$TARGET_CONFIG" ]]; then
+        source "$TARGET_CONFIG"
+        PROFILE_LOADED=1
+        echo "Successfully loaded profile: $TARGET_CONFIG"
+    else
+        echo "Warning: Desired profile not found at $TARGET_CONFIG"
+    fi
+fi
 
-  # Driver-level Anisotropic Filtering (16x) for sharper textures at a distance.
-  export RADV_TEX_ANISO=16
-
-  # [nocompute]: Simplifies the GPU queue to ensure consistent frame pacing.
-  export RADV_DEBUG=nocompute
-
-  # Persistent disk cache for shaders to reduce load times.
-  export RADV_SHADER_CACHE=1
-
-  echo -e "${RED}Starting steam with AMD GPU optimizations...${NC}"
-}
-
-# --- INTEL ARC/XE MODULE ---
-module_intel() {
-  # [nothrottle]: Disables frequency dips to keep clocks at maximum gaming speed.
-  # [rebind]: Optimizes memory management specifically for Intel's tile architecture.
-  export INTEL_DEBUG=nothrottle,rebind
-
-  # Multi-threaded command submission for Mesa-based Intel drivers.
-  export mesa_glthread=true
-
-  # Frame Buffer Compression: Saves memory bandwidth on integrated/mobile chips.
-  export ANV_ENABLE_FBC=1
-
-  # Disables internal measurement overhead for pure execution speed.
-  export INTEL_MEASURE=0
-
-  echo -e "${BLUE}Starting steam with Intel GPU optimizations...${NC}"
-}
-
-# --- NVIDIA CORE ENGINE (Shared between Proprietary and Hybrid) ---
-module_nvidia_core() {
-  # [__GL_MaxFramesAllowed]: Limits pre-render queue. Essential for "instant" input feel.
-  export __GL_MaxFramesAllowed=1
-
-  # Persistent shader cache path to prevent re-compiling every session.
-  export __GL_SHADER_DISK_CACHE=1
-  export __GL_SHADER_DISK_CACHE_PATH="$HOME/.cache/nvidia"
-
-  # Mandatory: Ensures XWayland/Applications use the NVIDIA proprietary stack.
-  export __GLX_VENDOR_LIBRARY_NAME=nvidia
-  export GBM_BACKEND=nvidia-drm
-
-  # Bridges Windows game calls to NVIDIA specific tech (DLSS, Reflex, NVAPI).
-  export PROTON_ENABLE_NVAPI=1
-  export PROTON_HIDE_NVIDIA_GPU=0
-
-  # Pure 64-bit library pathing for 2026 hardware performance.
-  export PROTON_NVIDIA_LIBS_NO_32BIT=1
-}
-
-# --- NVIDIA DESKTOP/PROPRIETARY EXTRAS ---
-module_nvidia_proprietary_extras() {
-  # Enables G-Sync/VRR support within the Gamescope/Wayland environment.
-  export __GL_GSYNC_ALLOWED=1
-  export __GL_VRR_ALLOWED=1
-
-  # [USLEEP]: Safer than "NOTHING". Prevents CPU starvation at very high refresh rates.
-  export __GL_YIELD="USLEEP"
-
-  # Accelerates data transfer between CPU and GPU memory.
-  export __GL_WRITE_COMBINED_MEMORY=1
-
-  # Fixes cursor disappearing or glitching in the Gamescope compositor.
-  export WLR_NO_HARDWARE_CURSORS=1
-
-  echo -e "${GREEN}Starting steam with Nvidia GPU optimizations...${NC}"
-}
-
-# --- NVIDIA LAPTOP/HYBRID EXTRAS ---
-module_nvidia_hybrid_extras() {
-  # Prime Offload: Forces the heavy rendering onto the NVIDIA dGPU.
-  export __NV_PRIME_RENDER_OFFLOAD=1
-  export __VK_LAYER_NV_optimus=NVIDIA_only
-
-  # Disables atomic check to prevent screen "flip" errors on specific laptop panels.
-  export WLR_DRM_NO_ATOMIC=1
-
-  # [2026 LATENCY FIX]: Syncs the iGPU and dGPU frames to prevent "half-frame" tearing.
-  export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
-
-  echo -e "${TEAL}Starting steam with Nvidia Hybrid GPU optimizations...${NC}"
-}
-
-# --- NVIDIA NVK (Open Source/Mesa) MODULE ---
-module_nvidia_nvk() {
-  # Clear proprietary variables to prevent driver pathing conflicts.
-  unset __GLX_VENDOR_LIBRARY_NAME
-  unset PROTON_ENABLE_NVAPI
-  unset PROTON_HIDE_NVIDIA_GPU
-
-  # Forces the use of the Nouveau/NVK open-source Vulkan driver.
-  export MESA_LOADER_DRIVER_OVERRIDE=nouveau
-
-  # [sync]: Ensures frame pacing is handled correctly by the NVK kernel module.
-  export NVK_DEBUG=sync
-  export NOUVEAU_MESA_DEBUG=1
-
-  # GPL support is experimental but essential to avoid NVK shader stutter.
-  export NVK_PERFTEST=gpl
-  export mesa_glthread=true
-
-  echo -e "${YELLOW}Starting steam with Nvidia FOSS GPU drivers and nouveau optimizations...${NC}"
-}
-
-# --- GENERIC MESA MODULE ---
-module_mesa_generic() {
-  # Safe for 99% of Mesa drivers; offloads draw calls to a separate CPU thread.
-  export mesa_glthread=true
-  echo -e "${MAGENTA}Starting steam with Generic GPU Optimizations...${NC}"
-}
+# Fallback Tier 1: Check user's classic configuration
+if [[ "$PROFILE_LOADED" -eq 0 ]]; then
+    if [[ -f "$FALLBACK_CONFIG" ]]; then
+        source "$FALLBACK_CONFIG"
+        PROFILE_LOADED=1
+        echo "Successfully loaded fallback configuration: $FALLBACK_CONFIG"
+    else
+        echo "Error: Neither targeted profile nor fallback configuration could be resolved!"
+        echo "Proceeding to launch using unoptimized default settings..."
+    fi
+fi
 
 # ------------------------------------------------------------------------------
 # 3. EXECUTION LOGIC (SYSTEM GPU SWITCH)
 # ------------------------------------------------------------------------------
-
-case "$GPU_SETUP" in
-  "amd")
-    module_amd
-    ;;
-  "intel")
-    module_intel
-    ;;
-  "nvidia")
-    # Proprietary Desktop Case
-    module_nvidia_core
-    module_nvidia_proprietary_extras
-    ;;
-  "nvidia_hybrid")
-    # Proprietary Laptop/Optimus Case (Shares Core)
-    module_nvidia_core
-    module_nvidia_hybrid_extras
-    ;;
-  "nvidia_nvk")
-    # Open Source Case
-    module_nvidia_nvk
-    ;;
-  *)
-    # Fallback for LLVMpipe or unknown hardware
-    module_mesa_generic
-    ;;
-esac
 
 # Show the SteamOS image in the tty terminal
 echo ""
@@ -223,6 +86,13 @@ sleep 3
 # 4. GAMESCOPE COMPOSITOR SETUP
 # ------------------------------------------------------------------------------
 
+# Fallback defaults (prevents Gamescope crash if configs are missing or paths are broken)
+: "${RENDER_WIDTH:=1280}"
+: "${RENDER_HEIGHT:=720}"
+: "${SCREENWIDTH:=1280}"
+: "${SCREENHEIGHT:=720}"
+: "${REFRESHRATE:=60}"
+
 # Using an array to handle arguments cleanly without quoting issues.
 GS_ARGS=(
   "-w" "$RENDER_WIDTH"      # Virtual width game sees
@@ -234,10 +104,7 @@ GS_ARGS=(
   "--adaptive-sync"         # VRR/G-Sync/FreeSync
   "--immediate-flips"       # Lowest possible latency (Tearing allowed if out of VRR)
   "--force-grab-cursor"     # Prevent mouse escaping the game window
-  "--grab"     # Prevent mouse escaping the game window
-  "-S" "fit"                # Scaling mode
-  "-F" "$UPSCALE_FILTER"    # fsr, nis, or linear
-  "--sharpness" "$SHARPNESS"
+  "--grab"                  # Prevent mouse escaping the game window
   "--mangoapp"              # Performance overlay support
   "--steam"                 # Integration with Steam UI
 )

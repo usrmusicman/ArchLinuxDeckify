@@ -7,38 +7,33 @@
 # ~/.bash_profile   (or append to ~/.profile if you use that instead)
 
 # ------------------------------------------------
-# Bash profile environment variables
+# Active Hardware & Resolution Profiles
 # ------------------------------------------------
+# Hardware profiles: e.g., "amdgpu-valve-steamdeck", "nvidia-acer-nitrov15", "xe-a770"
+export OEM_HARDWARE_PROFILE="amdgpu-valve-steamdeck"
 
-# SteamOS Gaming Session
+# Driver variant: 0 = nouveau (open-source), 1 = proprietary nvidia
+export NVIDIA_OFFICIAL="1"
+
+# Resolution profile: e.g., "1440p-144", "4k-60", "800p-60"
+export RESOLUTION_TARGET="1440p-144"
+
+# ------------------------------------------------
+# SteamOS Session Launchers
+# ------------------------------------------------
 export STEAMOS_GAMEMODE="/opt/steamos-session/steamos-gamemode-enhanced"
 export STEAMOS_SESSION_LAUNCHER="/opt/steamos-session/steamos-session-launcher"
-# Secondary Desktop Session
 export DESKTOP_AUTOLOGIN="startplasma-wayland"
 
-#### EXPERIMENTAL ###
-
-# rusticl specific
-#export RUSTICL_ENABLE=nvk  # 'iris' for Intel / 'radeonsi' for AMD / "nvk" for Nvidia using nvk+nouveau
-#export OCL_ICD_VENDORS=rusticl.icd
-
-# ------------------------------------------------
 # Session Logic
-# ------------------------------------------------
-
-# --- Start of SteamOS Session (Gamescope) ---
-
-# Mount all removable storage
-udiskie-mount -a
-
 if [ "$(tty)" = "/dev/tty1" ]; then
-	# Launch SteamOS Session
-	clear
-	$STEAMOS_SESSION_LAUNCHER
-	clear
-	unset SESSION_BINARY
-	clear
-	$DESKTOP_AUTOLOGIN
-	clear
-	exit
+    udiskie-mount -a
+    clear
+    $STEAMOS_SESSION_LAUNCHER
+    clear
+    unset SESSION_BINARY
+    clear
+    $DESKTOP_AUTOLOGIN
+    clear
+    exit
 fi
