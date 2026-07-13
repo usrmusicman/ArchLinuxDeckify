@@ -86,7 +86,7 @@ elif [[ "$1" == "--config" ]]; then
 	fi
 
 	# 4. Create symlink target directory if it doesn't exist
-	LINK_DIR="${HOME}/.local/share/steamos-session"
+	LINK_DIR="${HOME}/.config/steamos-session"
 	mkdir -p "${LINK_DIR}"
 
 	# 5. Generate/overwrite the symlink
