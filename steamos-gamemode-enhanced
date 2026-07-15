@@ -122,14 +122,22 @@ manage_wifi() {
 }
 
 manage_pipewire() {
+    local sw_pids=$(pgrep -u "$REAL_USER" -x "pipewire|wireplumber|pipewire-pulse")
+
     # Boost Software Daemons (PipeWire Stack)
     if [[ "$1" == "on" ]]; then
-        local sw_pids=$(pgrep -u "$REAL_USER" -x "pipewire|wireplumber|pipewire-pulse")
         if [[ -n "$sw_pids" ]]; then
             for pid in $sw_pids; do
                 chrt -f -p "$RT_PRIO_PIPEWIRE" "$pid" 2>/dev/null
             done
             confirm "Audio Stack -> Software RT Priority $RT_PRIO_PIPEWIRE Applied"
+        fi
+    else
+        if [[ -n "$sw_pids" ]]; then
+            for pid in $sw_pids; do
+                chrt -o -p 0 "$pid" 2>/dev/null
+            done
+            confirm "Audio Stack -> Default Priority Restored"
         fi
     fi
 }
@@ -153,27 +161,38 @@ manage_soundcards() {
             done
             confirm "Onboard Sound -> RT Priority $RT_PRIO_SOUND Applied"
         fi
+    else
+        if [[ -n "$sound_irqs" ]]; then
+            for pid in $sound_irqs; do
+                chrt -o -p 0 "$pid" 2>/dev/null
+            done
+            confirm "Onboard Sound -> Default Priority Restored"
+        fi
     fi
 }
 
 # Configure USB polling threads for Real-Time execution
 manage_usb() {
     local pids=$(pgrep -f "xhci")
+
     if [[ "$1" == "on" ]]; then
         # Disable power autosuspend to prevent USB controller "sleep" latency
         echo -1 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
         # Apply SCHED_FIFO (Real-Time) to USB controllers
         for pid in $pids; do
             if [[ "$RT_PRIO_USB" -gt 0 ]]; then
-                chrt -f -p "$RT_PRIO_USB" "$pid"
+                chrt -f -p "$RT_PRIO_USB" "$pid" 2>/dev/null
             else
                 # If 0, reset to the default scheduling policy
-                chrt -o -p 0 "$pid"
+                chrt -o -p 0 "$pid" 2>/dev/null
             fi
         done
         confirm "USB -> RT Priority $RT_PRIO_USB & Autosuspend -1"
     else
         echo 2 | tee /sys/module/usbcore/parameters/autosuspend >/dev/null
+        for pid in $pids; do
+            chrt -o -p 0 "$pid" 2>/dev/null
+        done
         confirm "USB -> Default states restored"
     fi
 }
@@ -222,10 +241,17 @@ revert_defaults() {
     notify "Restoring system defaults..."
     manage_sysctl off
     manage_wifi off
+    manage_pipewire off
+    manage_soundcards off
     manage_usb off
     manage_gpu off
     manage_thp off
-    if command -v scxctl &>/dev/null; then scxctl stop >/dev/null 2>&1; fi
+
+    if command -v scxctl &>/dev/null; then
+        scxctl stop >/dev/null 2>&1
+        confirm "Scheduler -> Default Kernel CFS Restored"
+    fi
+
     confirm "System defaults restored"
 }
 
