@@ -213,11 +213,34 @@ manage_gpu() {
                 done
             fi
             ;;
+        intel)
+            if [[ "$action" == "on" ]]; then
+                for dev in /sys/class/drm/card*/gt/gt*/; do
+                    if [[ -f "${dev}rps_max_freq_mhz" && -f "${dev}rps_boost_freq_mhz" ]]; then
+                        cat "${dev}rps_boost_freq_mhz" > "${dev}rps_max_freq_mhz" 2>/dev/null
+                    fi
+                done
+                confirm "GPU (Intel) -> Performance Limits Uncapped"
+            else
+                for dev in /sys/class/drm/card*/gt/gt*/; do
+                    if [[ -f "${dev}rps_RP0_freq_mhz" && -f "${dev}rps_max_freq_mhz" ]]; then
+                        cat "${dev}rps_RP0_freq_mhz" > "${dev}rps_max_freq_mhz" 2>/dev/null
+                    fi
+                done
+                confirm "GPU (Intel) -> Default Performance Defaults Restored"
+            fi
+            ;;
         nvidia)
             if [[ "$action" == "on" ]]; then
                 nvidia-smi -pm 1 >/dev/null 2>&1
                 runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=1" >/dev/null 2>&1
+                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:1]/GPUPowerMizerMode=1" >/dev/null 2>&1
                 confirm "GPU (NVIDIA) -> Performance Mode"
+            else
+                nvidia-smi -pm 0 >/dev/null 2>&1
+                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:0]/GPUPowerMizerMode=0" >/dev/null 2>&1
+                runuser -u "$REAL_USER" -- nvidia-settings -a "[gpu:1]/GPUPowerMizerMode=0" >/dev/null 2>&1
+                confirm "GPU (NVIDIA) -> Powersave Mode"
             fi
             ;;
     esac
