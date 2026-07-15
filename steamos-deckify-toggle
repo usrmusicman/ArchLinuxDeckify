@@ -5,6 +5,11 @@ BASEDIR="/opt/steamos-session"
 # Set default directory for HARDWARE_CONFIG if not already set by the environment
 HARDWARE_CONFIG="${HARDWARE_CONFIG:-${BASEDIR}/config/session/hardware}"
 
+# If no arguments are provided (e.g., clicked from a file manager), default to --config --gui
+if [[ $# -eq 0 ]]; then
+	set -- "--config" "--gui"
+fi
+
 if [[ "$1" == "--deckify" ]]; then
 	cp ${BASEDIR}/config/.bash_profile.deckify ${HOME}/.bash_profile
 	if [[ -x "/usr/bin/plasmalogin" ]]; then
@@ -48,30 +53,52 @@ elif [[ "$1" == "--normal" ]]; then
 		echo -e "Display session manager not supported"
 	fi
 elif [[ "$1" == "--config" ]]; then
-	# 1. Check if a configuration argument was provided
-	if [[ -z "$2" ]]; then
-		# If given no argument, then and ONLY then list the configurations recursively
-		echo -e "Available configurations under ${HARDWARE_CONFIG}:"
-		echo -e "--------------------------------------------------"
+	# 1. Require either --cli or --gui
+	if [[ "$2" == "--cli" ]]; then
+		# Check if a configuration argument was provided
+		if [[ -z "$3" ]]; then
+			# If given no argument, then and ONLY then list the configurations recursively
+			echo -e "Available configurations under ${HARDWARE_CONFIG}:"
+			echo -e "--------------------------------------------------"
 
-		if [[ -d "${HARDWARE_CONFIG}" ]]; then
-			# Recursively find all files, filtering only those with a bash shebang
-			find "${HARDWARE_CONFIG}" -type f -print0 | while IFS= read -r -d '' file; do
-				if head -n 1 "$file" | grep -q "bash"; then
-					echo -e "Config: $(basename "$file")"
-					echo -e "Path:   $file"
-					echo -e "--------------------------------------------------"
-				fi
-			done
+			if [[ -d "${HARDWARE_CONFIG}" ]]; then
+				# Recursively find all files, filtering only those with a bash shebang
+				find "${HARDWARE_CONFIG}" -type f -print0 | while IFS= read -r -d '' file; do
+					if head -n 1 "$file" | grep -q "bash"; then
+						echo -e "Config: $(basename "$file")"
+						echo -e "Path:   $file"
+						echo -e "--------------------------------------------------"
+					fi
+				done
+			else
+				echo -e "Error: Directory ${HARDWARE_CONFIG} does not exist."
+				exit 1
+			fi
+			exit 0
+		fi
+		# If an argument is given, treat $3 as the whole path
+		CONFIG_PATH="$3"
+
+	elif [[ "$2" == "--gui" ]]; then
+		# GUI file selection logic: try kdialog first, fallback to zenity
+		if command -v kdialog &> /dev/null; then
+			CONFIG_PATH=$(kdialog --title "Select Hardware Profile" --getopenfilename "${HARDWARE_CONFIG}")
+		elif command -v zenity &> /dev/null; then
+			CONFIG_PATH=$(zenity --file-selection --title="Select Hardware Profile" --filename="${HARDWARE_CONFIG}/")
 		else
-			echo -e "Error: Directory ${HARDWARE_CONFIG} does not exist."
+			echo -e "Error: Neither kdialog nor zenity is installed. Cannot launch GUI."
 			exit 1
 		fi
-		exit 0
-	fi
 
-	# If an argument is given, bypass the listing completely and treat $2 as the whole path
-	CONFIG_PATH="$2"
+		# Handle the case where the user cancels the file picker prompt or empty input is returned
+		if [[ -z "${CONFIG_PATH}" ]]; then
+			echo -e "File selection canceled. Exiting gracefully."
+			exit 0
+		fi
+	else
+		echo -e "Error: --config requires either --gui or --cli as an argument."
+		exit 1
+	fi
 
 	# 2. Verify file existence at the specified full path
 	if [[ ! -f "${CONFIG_PATH}" ]]; then
@@ -100,7 +127,8 @@ elif [[ "$1" == "--help" ]]; then
 	echo -e ""
 	echo -e "--deckify: Toggle the steamdeck console setup"
 	echo -e "--normal: Toggle normal install without the gamemode console boot sequence"
-	echo -e "--config [full_path]: Link the chosen hardware profile path (leave empty to list configs)"
+	echo -e "--config --cli [full_path]: Link the chosen hardware profile path (leave empty to list configs)"
+	echo -e "--config --gui: Launch a graphical file picker to choose the hardware profile path"
 	echo -e "--help: Show this help message"
 else
 	echo -e "Please type in a valid option, use --help for more details"

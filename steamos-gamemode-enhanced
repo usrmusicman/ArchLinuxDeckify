@@ -69,6 +69,37 @@ display_status() {
 # CORE FUNCTIONS
 # --------------------------
 
+# Manage Kernel Sysctl Tunables for Gaming
+manage_sysctl() {
+    if [[ "$1" == "on" ]]; then
+        # Apply performance tunables
+        sysctl -q -w vm.swappiness=1
+        sysctl -q -w vm.vfs_cache_pressure=50
+        sysctl -q -w vm.max_map_count=1048576
+        sysctl -q -w net.core.netdev_max_backlog=5000
+        sysctl -q -w net.ipv4.tcp_fastopen=3
+        sysctl -q -w kernel.sched_rt_runtime_us=-1
+        sysctl -q -w kernel.numa_balancing=0
+        sysctl -q -w vm.stat_interval=10
+        sysctl -q -w kernel.timer_migration=0
+
+        confirm "Sysctl -> Gamemode Enhanced profile applied"
+    else
+        # Revert to Arch Linux standard kernel/systemd defaults
+        sysctl -q -w vm.swappiness=60
+        sysctl -q -w vm.vfs_cache_pressure=100
+        sysctl -q -w vm.max_map_count=1048576  # Modern systemd standard
+        sysctl -q -w net.core.netdev_max_backlog=1000
+        sysctl -q -w net.ipv4.tcp_fastopen=1
+        sysctl -q -w kernel.sched_rt_runtime_us=950000
+        sysctl -q -w kernel.numa_balancing=0
+        sysctl -q -w vm.stat_interval=1
+        sysctl -q -w kernel.timer_migration=1
+
+        confirm "Sysctl -> Restored to Arch Linux defaults"
+    fi
+}
+
 # Manage Transparent Hugepages (THP) - Disabling can reduce frame-time stuttering
 manage_thp() {
     if [[ "$1" == "on" ]]; then
@@ -189,6 +220,7 @@ start_scheduler() {
 # Restore system to standard operational state
 revert_defaults() {
     notify "Restoring system defaults..."
+    manage_sysctl off
     manage_wifi off
     manage_usb off
     manage_gpu off
@@ -276,6 +308,7 @@ done
 
 # Activating Overrides
 notify "Engaging Performance Mode..."
+manage_sysctl on
 manage_thp on
 manage_wifi on
 manage_pipewire on
