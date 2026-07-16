@@ -22,7 +22,7 @@ export RENDER_HEIGHT=1440
 export MESA_LOADER_DRIVER_OVERRIDE=nouveau
 export NOUVEAU_MESA_DEBUG=1
 export NVK_DEBUG=sync
-export NVK_PERFTEST=gpl
+export NVK_PERFTEST=gpl,nggc,sam,rt
 export mesa_glthread=true
 
 # ------------------------------------------------

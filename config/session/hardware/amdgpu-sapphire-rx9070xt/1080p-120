@@ -20,7 +20,7 @@ export RENDER_HEIGHT=1080
 # ------------------------------------------------
 
 export mesa_glthread=true
-export RADV_PERFTEST=gpl,nggc,sam
+export RADV_PERFTEST=gpl,nggc,sam,rt,rt
 export RADV_SHADER_CACHE=1
 
 # ------------------------------------------------
