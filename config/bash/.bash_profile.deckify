@@ -7,6 +7,14 @@
 # ~/.bash_profile   (or append to ~/.profile if you use that instead)
 
 # ------------------------------------------------
+# Experimental Features
+# ------------------------------------------------
+
+# rusticl specific
+#export RUSTICL_ENABLE=nvk  # 'iris' for Intel / 'radeonsi' for AMD / "nvk" for Nvidia using nvk+nouveau
+#export OCL_ICD_VENDORS=rusticl.icd
+
+# ------------------------------------------------
 # Active Hardware & Resolution Profiles
 # ------------------------------------------------
 # Hardware profiles: e.g., "amdgpu-valve-steamdeck", "nvidia-acer-nitrov15", "xe-a770"
@@ -27,13 +35,13 @@ export DESKTOP_AUTOLOGIN="startplasma-wayland"
 
 # Session Logic
 if [ "$(tty)" = "/dev/tty1" ]; then
-    sudo $STEAMOS_GAMEMODE -s lavd -m gaming
-    clear
     udiskie-mount -a
+    clear
+    sudo $STEAMOS_GAMEMODE -s lavd -m gaming
     clear
     $STEAMOS_SESSION_LAUNCHER
     clear
-    unset SESSION_BINARY
+    sudo $STEAMOS_GAMEMODE -x
     clear
     $DESKTOP_AUTOLOGIN
     clear

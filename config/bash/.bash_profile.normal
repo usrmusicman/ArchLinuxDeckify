@@ -6,8 +6,16 @@
 
 # ~/.bash_profile   (or append to ~/.profile if you use that instead)
 
-#### EXPERIMENTAL ###
+# ------------------------------------------------
+# Experimental Features
+# ------------------------------------------------
 
 # rusticl specific
 #export RUSTICL_ENABLE=nvk  # 'iris' for Intel / 'radeonsi' for AMD / "nvk" for Nvidia using nvk+nouveau
 #export OCL_ICD_VENDORS=rusticl.icd
+
+# ------------------------------------------------
+# Desktop Session
+# ------------------------------------------------
+
+udiskie-mount -a
