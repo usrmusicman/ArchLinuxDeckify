@@ -303,7 +303,6 @@ revert_defaults() {
     fi
 
     set_power_profile power-saver
-    confirm "System defaults restored"
     notify "Normal Mode -> ACTIVE"
 }
 
