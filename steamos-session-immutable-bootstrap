@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+TARGET="/usr/bin/steamos-session-select"
+TMP_FILE="/tmp/steamos-session-select.tmp"
+
+# 1. Create the content safely
+cat <<EOF > "$TMP_FILE"
+#!/usr/bin/env bash
+# Managed by ArchLinuxDeckify
+steam -exit
+EOF
+
+chmod +x "$TMP_FILE"
+
+# 2. Apply changes
+if ! cmp -s "$TMP_FILE" "$TARGET"; then
+    echo "Updating steamos-session-select..."
+    sudo ostree admin unlock
+    sudo mv "$TMP_FILE" "$TARGET"
+    sudo ostree admin lock-finalization
+else
+    echo "steamos-session-select is already correctly configured."
+fi
+
+# 3. Always clean up the temp file
+rm -f "$TMP_FILE"

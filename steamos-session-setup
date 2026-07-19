@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+set -e # Exit immediately if a command exits with a non-zero status
+
+# Identify the actual user, even if the script is run with sudo
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+
+if [[ "$1" == "--install" ]]; then
+
+    if [[ "$2" == "--immutable" ]]; then
+        # Immutable install path targets the user's home directory
+        STEAMOS_SESSION_PATH="$TARGET_HOME/.local/bin/steamos-session"
+    elif [[ "$2" == "--normal" ]]; then
+        # Normal install path
+        STEAMOS_SESSION_PATH="/opt/steamos-session"
+    else
+        echo "Error: Please specify --normal or --immutable"
+        exit 1
+    fi
+
+    echo "Installing SteamOS Session to $STEAMOS_SESSION_PATH..."
+
+    # Install scripts (Executable)
+    sudo install -Dm755 "$PWD/steamos-deckify-toggle" "$STEAMOS_SESSION_PATH/steamos-deckify-toggle"
+    sudo install -Dm755 "$PWD/steamos-session-immutable-bootstrap" "$STEAMOS_SESSION_PATH/steamos-session-immutable-bootstrap"
+    sudo install -Dm755 "$PWD/steamos-gamemode-enhanced" "$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced"
+    sudo install -Dm755 "$PWD/steamos-session-launcher" "$STEAMOS_SESSION_PATH/steamos-session-launcher"
+    sudo install -Dm755 "$PWD/steamos-session-select" "$STEAMOS_SESSION_PATH/steamos-session-select"
+
+    # Install hardware startup configs (Non-executable)
+    sudo install -Dm644 "$PWD/config/session/hardware/default/1080p-60" "$STEAMOS_SESSION_PATH/config/session/hardware/default/1080p-60"
+    sudo install -Dm644 "$PWD/config/session/hardware/default/1440p-60" "$STEAMOS_SESSION_PATH/config/session/hardware/default/1440p-60"
+    sudo install -Dm644 "$PWD/config/session/hardware/default/2160p-60" "$STEAMOS_SESSION_PATH/config/session/hardware/default/2160p-60"
+
+    # Install the bash .profile templates
+    sudo install -Dm644 "$PWD/bash/.bash_profile.deckify" "$STEAMOS_SESSION_PATH/config/bash/.bash_profile.deckify"
+    sudo install -Dm644 "$PWD/config/bash/.bash_profile.normal" "$STEAMOS_SESSION_PATH/config/bash/.bash_profile.normal"
+
+    # Install the associated assets
+    sudo install -Dm644 "$PWD/assets/icons/steamos-session-icon.png" "$STEAMOS_SESSION_PATH/assets/icons/steamos-session-icon.png"
+
+    # Install Extras
+    if [[ "$3" == "--extras" ]]; then
+        sudo install -dm755 "$STEAMOS_SESSION_PATH/config/session/hardware"
+        sudo cp -rvf "$PWD/config/session/hardware/amdgpu-sapphire-rx9070xt" "$STEAMOS_SESSION_PATH/config/session/hardware/"
+        sudo cp -rvf "$PWD/config/session/hardware/amdgpu-valve-steamdeck" "$STEAMOS_SESSION_PATH/config/session/hardware/"
+        sudo cp -rvf "$PWD/config/session/hardware/nvidia-acer-nitrov15" "$STEAMOS_SESSION_PATH/config/session/hardware/"
+        sudo cp -rvf "$PWD/config/session/hardware/nvidia-fe-rtx2080ti" "$STEAMOS_SESSION_PATH/config/session/hardware/"
+        sudo cp -rvf "$PWD/config/session/hardware/nvidia-pny-rtx4080super" "$STEAMOS_SESSION_PATH/config/session/hardware/"
+        sudo cp -rvf "$PWD/config/session/hardware/xe-asrock-b580" "$STEAMOS_SESSION_PATH/config/session/hardware/"
+        sudo cp -rvf "$PWD/config/session/hardware/xe-le-a770" "$STEAMOS_SESSION_PATH/config/session/hardware/"
+    fi
+
+    # Ensure correct ownership if installed to user's home directory (Immutable)
+    if [[ "$2" == "--immutable" ]]; then
+        sudo chown -R "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/.local/bin/steamos-session"
+    fi
+
+    # Safely install sudoers override file
+    echo "Configuring sudoers..."
+    TMP_SUDOERS=$(mktemp)
+
+    if [[ "$2" == "--immutable" ]]; then
+        cat <<EOF > "$TMP_SUDOERS"
+# SteamOS Enhanced Gamemode
+%wheel ALL=(ALL) NOPASSWD: $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced
+%wheel ALL=(ALL) NOPASSWD: $STEAMOS_SESSION_PATH/steamos-session-immutable-bootstrap
+EOF
+    else
+        cat <<EOF > "$TMP_SUDOERS"
+# SteamOS Enhanced Gamemode
+%wheel ALL=(ALL) NOPASSWD: $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced
+EOF
+    fi
+
+    # Validate sudoers syntax before applying to prevent locking out sudo
+    if sudo visudo -cf "$TMP_SUDOERS" &>/dev/null; then
+        sudo install -Dm440 "$TMP_SUDOERS" "/etc/sudoers.d/10-steamos-session-overrides"
+    else
+        echo "Sudoers syntax validation failed! Aborting to prevent lockout."
+        rm -f "$TMP_SUDOERS"
+        exit 1
+    fi
+    rm -f "$TMP_SUDOERS"
+
+    # Install Getty Override Template using the actual user
+    sudo install -dm755 "/etc/systemd/system/getty@tty1.service.d"
+    sudo tee "/etc/systemd/system/getty@tty1.service.d/override.conf" > /dev/null <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $TARGET_USER --noclear %I 38400 linux
+EOF
+
+    # Install Pacman Hook only if the directory exists (protects against failing on non-Arch systems)
+    if [[ -d "/usr/share/libalpm/hooks" ]]; then
+        sudo tee "/usr/share/libalpm/hooks/gamescope-capabilities.hook" > /dev/null <<EOF
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = gamescope
+
+[Action]
+Description = Restoring setcap 'cap_sys_nice=eip' to gamescope...
+When = PostTransaction
+Exec = /usr/bin/setcap 'cap_sys_nice=eip' /usr/bin/gamescope
+EOF
+    fi
+
+    # System Configuration Files Setup
+    sudo install -dm755 "/etc/udev/rules.d"
+    sudo install -dm755 "/etc/modules-load.d"
+    sudo install -dm755 "/etc/modprobe.d"
+    sudo install -dm755 "/etc/mkinitcpio.conf.d"
+
+    # I/O Schedulers
+    sudo tee "/etc/udev/rules.d/60-ioschedulers.rules" > /dev/null <<EOF
+# Set BFQ for rotational drives (HDDs)
+ACTION=="add|change", KERNEL=="sd[a-z]*|mmcblk[0-9]*", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="bfq"
+
+# Set 'none' for non-rotational NVMe drives
+ACTION=="add|change", KERNEL=="nvme[0-9]*n[0-9]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+
+# Set 'none' for non-rotational SATA SSDs
+ACTION=="add|change", KERNEL=="sd[a-z]*", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="none"
+EOF
+
+    # ntsync module load configuration
+    sudo tee "/etc/modules-load.d/ntsync.conf" > /dev/null <<EOF
+ntsync
+EOF
+
+    # udev rule for /dev/ntsync
+    sudo tee "/etc/udev/rules.d/99-ntsync.rules" > /dev/null <<EOF
+KERNEL=="ntsync", MODE="0666"
+EOF
+
+    # Uinput alias modprobe
+    sudo tee "/etc/modprobe.d/10-uinput.conf" > /dev/null <<EOF
+alias char-major-10-223 uinput
+EOF
+
+    # Performance & Filesystem Modules
+    sudo tee "/etc/mkinitcpio.conf.d/10-performance.conf" > /dev/null <<EOF
+MODULES+=(ntsync ext4 nls_ascii nls_utf8)
+EOF
+
+    # Force uinput module to load at boot
+    sudo tee "/etc/modules-load.d/uinput.conf" > /dev/null <<EOF
+uinput
+EOF
+
+    # Udev rule for input group (Crucial for Steam/Controllers)
+    sudo tee "/etc/udev/rules.d/99-uinput.rules" > /dev/null <<EOF
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
+EOF
+
+    echo "Installation complete."
+
+elif [[ "$1" == "--uninstall" ]]; then
+
+    if [[ "$2" == "--normal" ]]; then
+        sudo rm -rf /opt/steamos-session
+    elif [[ "$2" == "--immutable" ]]; then
+        rm -rf "$TARGET_HOME/.local/bin/steamos-session"
+    else
+        echo "Error: Please specify --normal or --immutable"
+        exit 1
+    fi
+
+    # Clean up system files (using -f to prevent errors if files are already missing)
+    sudo rm -f "/etc/mkinitcpio.conf.d/10-performance.conf"
+    sudo rm -f "/etc/modprobe.d/10-uinput.conf"
+    sudo rm -f "/etc/modules-load.d/uinput.conf"
+    sudo rm -f "/etc/modules-load.d/ntsync.conf"
+    sudo rm -f "/etc/sudoers.d/10-steamos-session-overrides"
+    sudo rm -f "/etc/systemd/system/getty@tty1.service.d/override.conf"
+    sudo rm -f "/etc/udev/rules.d/60-ioschedulers.rules"
+    sudo rm -f "/etc/udev/rules.d/99-uinput.rules"
+    sudo rm -f "/etc/udev/rules.d/99-ntsync.rules"
+    sudo rm -f "/usr/share/libalpm/hooks/gamescope-capabilities.hook"
+
+    echo "Uninstallation complete."
+
+else
+    echo "Usage: $0 {--install|--uninstall} {--normal|--immutable} [--extras]"
+    exit 1
+fi

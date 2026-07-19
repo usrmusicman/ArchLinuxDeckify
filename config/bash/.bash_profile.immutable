@@ -29,14 +29,16 @@ export RESOLUTION_TARGET="1080p-60"
 # ------------------------------------------------
 # SteamOS Session Launchers
 # ------------------------------------------------
-export STEAMOS_SESSION_PATH="/opt/steamos-session"
+export STEAMOS_SESSION_PATH="$HOME/.local/bin/steamos-session"
 
+export STEAMOS_SESSION_IMMUTABLE_COMPAT="$STEAMOS_SESSION_PATH/steamos-session-immutable-bootstrap"
 export STEAMOS_GAMEMODE="$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced"
 export STEAMOS_SESSION_LAUNCHER="$STEAMOS_SESSION_PATH/steamos-session-launcher"
 export DESKTOP_AUTOLOGIN="startplasma-wayland"
 
 # Session Logic
 if [ "$(tty)" = "/dev/tty1" ]; then
+    sudo $STEAMOS_SESSION_IMMUTABLE_COMPAT
     udiskie-mount -a
     clear
     sudo $STEAMOS_GAMEMODE -s lavd -m gaming
