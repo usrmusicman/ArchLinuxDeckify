@@ -52,7 +52,6 @@ export RT_PRIO_SOUND=70
 # ------------------------------------------------
 
 # Wayland + Gamescope
-export PROTON_ENABLE_WAYLAND=1
 export ENABLE_GAMESCOPE_WSI=1
 
 # HDR
