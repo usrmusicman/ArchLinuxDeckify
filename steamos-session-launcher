@@ -107,6 +107,7 @@ GS_ARGS=(
   "--grab"                  # Prevent mouse escaping the game window
   "--mangoapp"              # Performance overlay support
   "--steam"                 # Integration with Steam UI
+  "--expose-wayland"        # Enable Wayland-native client support
 )
 
 # ------------------------------------------------------------------------------
