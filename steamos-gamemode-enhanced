@@ -50,7 +50,7 @@ display_status() {
 
     echo -e "\n${YLW}=== ENVIRONMENT ===${NC}"
     echo -e "${GRN}Active User:${NC} $REAL_USER (UID: $user_uid)"
-    echo -e "${GRN}CPU Governor:${NC} $cpu_gov"
+    echo -e "${GRN}CPU Profile & Governor:${NC} $cpu_gov"
 
     echo -e "\n${YLW}=== THREADED IRQs (Interrupt Requests) ===${NC}"
     echo -e "Displaying hardware interrupts sorted by Real-Time (RT) Priority:"
