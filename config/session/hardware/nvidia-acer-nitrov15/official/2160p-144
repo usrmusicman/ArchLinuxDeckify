@@ -33,7 +33,6 @@ export __NV_PRIME_RENDER_OFFLOAD_TRUSTED=1
 export GBM_BACKEND=nvidia-drm
 export PROTON_ENABLE_NVAPI=1
 export PROTON_HIDE_NVIDIA_GPU=0
-export PROTON_NVIDIA_LIBS_NO_32BIT=1
 export WLR_DRM_NO_ATOMIC=1
 export WLR_NO_HARDWARE_CURSORS=1
 
@@ -42,10 +41,10 @@ export WLR_NO_HARDWARE_CURSORS=1
 # ------------------------------------------------
 
 # Set IRQ threads up to a value 97 is acceptable
-export RT_PRIO_USB=90
-export RT_PRIO_PIPEWIRE=85
-export RT_PRIO_BT=80
-export RT_PRIO_SOUND=70
+export RT_PRIO_USB=95
+export RT_PRIO_PIPEWIRE=90
+export RT_PRIO_BT=85
+export RT_PRIO_SOUND=80
 
 # ------------------------------------------------
 # Common Proton / Gamescope / Steam defaults
@@ -66,13 +65,27 @@ export MESA_VK_WSI_PRESENT_MODE=mailbox
 # DX12
 export VKD3D_CONFIG=dxr
 
-# [GLOBAL]: Pure 64-bit environment for 2026 performance.
-# This eliminates 32-bit thunking overhead for modern titles.
-# NOTE: If EAC (Easy Anti-Cheat) titles fail, comment this out.
-export PROTON_USE_WOW64=1
-
 # Enable the use of the new WINENTSYNC implementation to reduce loading and streaming overhead
 export WINENTSYNC=1
+
+# ------------------------------------------------
+# Experimental Features (Uncomment)
+# ------------------------------------------------
+
+# DX12 / VKD3D Low-Latency Settings
+#export PROTON_VKD3D_LOWLATENCY=1
+#export VKD3D_LOW_LATENCY_OFFSET=200
+#export VKD3D_FRAME_RATE=140
+
+# DX9/10/11 / DXVK Low-Latency Settings
+#export PROTON_DXVK_LOWLATENCY=1
+#export DXVK_FRAME_PACE="low-latency-vrr-144"
+
+# Pure 64-bit environment for 2026 performance
+#export PROTON_USE_WOW64=1
+
+# Do not use the 32-bit nvidia libs
+#export PROTON_NVIDIA_LIBS_NO_32BIT=1
 
 # ------------------------------------------------
 # Font Text Colors

@@ -12,8 +12,8 @@ export REFRESHRATE=120
 
 # Internal Render Resolution (The "Game" resolution)
 # Example: Set to 1920x1080 to upscale to 1440p
-export RENDER_WIDTH=1280
-export RENDER_HEIGHT=800
+export RENDER_WIDTH=1920
+export RENDER_HEIGHT=1080
 
 # ------------------------------------------------
 # Hardware Specific Toggles
@@ -28,10 +28,10 @@ export RADV_SHADER_CACHE=1
 # ------------------------------------------------
 
 # Set IRQ threads up to a value 97 is acceptable
-export RT_PRIO_USB=90
-export RT_PRIO_PIPEWIRE=85
-export RT_PRIO_BT=80
-export RT_PRIO_SOUND=70
+export RT_PRIO_USB=95
+export RT_PRIO_PIPEWIRE=90
+export RT_PRIO_BT=85
+export RT_PRIO_SOUND=80
 
 # ------------------------------------------------
 # Common Proton / Gamescope / Steam defaults
@@ -52,13 +52,24 @@ export MESA_VK_WSI_PRESENT_MODE=mailbox
 # DX12
 export VKD3D_CONFIG=dxr
 
-# [GLOBAL]: Pure 64-bit environment for 2026 performance.
-# This eliminates 32-bit thunking overhead for modern titles.
-# NOTE: If EAC (Easy Anti-Cheat) titles fail, comment this out.
-export PROTON_USE_WOW64=1
-
 # Enable the use of the new WINENTSYNC implementation to reduce loading and streaming overhead
 export WINENTSYNC=1
+
+# ------------------------------------------------
+# Experimental Features (Uncomment)
+# ------------------------------------------------
+
+# DX12 / VKD3D Low-Latency Settings
+#export PROTON_VKD3D_LOWLATENCY=1
+#export VKD3D_LOW_LATENCY_OFFSET=200
+#export VKD3D_FRAME_RATE=115
+
+# DX9/10/11 / DXVK Low-Latency Settings
+#export PROTON_DXVK_LOWLATENCY=1
+#export DXVK_FRAME_PACE="low-latency-vrr-120"
+
+# Pure 64-bit environment for 2026 performance.
+#export PROTON_USE_WOW64=1
 
 # ------------------------------------------------
 # Font Text Colors
