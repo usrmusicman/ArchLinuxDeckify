@@ -15,22 +15,9 @@
 #export OCL_ICD_VENDORS=rusticl.icd
 
 # ------------------------------------------------
-# Active Hardware & Resolution Profiles
-# ------------------------------------------------
-# Hardware profiles: e.g., "amdgpu-valve-steamdeck", "nvidia-acer-nitrov15", "xe-a770"
-export OEM_HARDWARE_PROFILE="default"
-
-# Driver variant: 0 = nouveau (open-source), 1 = proprietary nvidia
-export NVIDIA_OFFICIAL="1"
-
-# Resolution profile: e.g., "1440p-144", "4k-60", "800p-60"
-export RESOLUTION_TARGET="1080p-60"
-
-# ------------------------------------------------
 # SteamOS Session Launchers
 # ------------------------------------------------
 export STEAMOS_SESSION_PATH="$HOME/.local/bin/steamos-session"
-
 export STEAMOS_SESSION_IMMUTABLE_COMPAT="$STEAMOS_SESSION_PATH/steamos-session-immutable-bootstrap"
 export STEAMOS_GAMEMODE="$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced"
 export STEAMOS_SESSION_LAUNCHER="$STEAMOS_SESSION_PATH/steamos-session-launcher"

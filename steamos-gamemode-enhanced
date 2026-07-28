@@ -3,6 +3,15 @@
 # Explicit GPU / USB / PipeWire Low-Latency Wrapper
 # Author: Alexander Mcmillan <linuxguy93@gmail.com>
 
+# ------------------------------------------------------------------------------
+# INITIALIZATION & ARGUMENT PARSING
+# ------------------------------------------------------------------------------
+
+# Check if TERM variable is empty and then set it.
+if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
+    export TERM=linux
+fi
+
 # --------------------------
 # COLORS & UTILS
 # --------------------------
@@ -74,33 +83,6 @@ display_status() {
 # --------------------------
 # CORE FUNCTIONS
 # --------------------------
-
-# Manage powerprofilesctl profiles independently
-set_power_profile() {
-    local profile="$1"
-
-    if ! command -v powerprofilesctl &>/dev/null; then
-        echo -e "${RED}ERROR: powerprofilesctl is not installed or not in PATH.${NC}"
-        exit 1
-    fi
-
-    # Notification message
-    notify "Configuring system power profile to: ${CYN}${profile}${NC}..."
-
-    # Check for the power profile being set
-    if powerprofilesctl set "$profile" 2>/dev/null; then
-        confirm "Power Profile -> $profile"
-    elif [[ "$1" == "performance" ]]; then
-        powerprofilesctl set performance 2>/dev/null
-        confirm "Power Profile -> performance"
-    elif [[ "$1" == "power-saver" ]]; then
-        powerprofilesctl set power-saver 2>/dev/null
-        confirm "Power Profile -> power-saver"
-    else
-        confirm "${RED}ERROR: Failed to set profile to '$profile'. Check if it is a valid daemon profile.${NC}"
-        exit 1
-    fi
-}
 
 # Manage Kernel Sysctl Tunables for Gaming
 manage_sysctl() {
@@ -327,7 +309,6 @@ revert_defaults() {
         confirm "Scheduler -> Default Kernel CFS Restored"
     fi
 
-    set_power_profile power-saver
     notify "Normal Mode -> ACTIVE"
 }
 
@@ -344,8 +325,6 @@ show_help() {
     echo -e "\n${GRN}USAGE:${NC} sudo $0 [OPTIONS]"
 
     echo -e "\n${CYN}CORE OPTIONS:${NC}"
-    echo -e "  ${YLW}-p <profile>${NC}   Sets the powerprofilesctl daemon profile independently."
-    echo -e "                  (e.g., performance, balanced, power-saver)"
     echo -e "  ${YLW}-s <scheduler>${NC} Injects a custom eBPF scheduler via SCX. Overrides the default"
     echo -e "                  CFS scheduler in the Linux Kernel. (Default: lavd)"
     echo -e "  ${YLW}-m <mode>${NC}      Applies a specific behavioral profile to the chosen SCX scheduler."
@@ -403,7 +382,6 @@ while getopts "s:m:p:q:r:l:ixh" opt; do
     case "$opt" in
         s) SCHED_NAME=$OPTARG ;;
         m) SCHED_MODE=$OPTARG ;;
-        p) set_power_profile "$OPTARG"; exit 0 ;;
         i) display_status ;;
         x) revert_defaults; exit 0 ;;
         h) show_help ;;
@@ -422,6 +400,5 @@ manage_usb on
 manage_gpu on
 manage_cpu_governor on
 start_scheduler
-set_power_profile performance
 
 notify "Performance Mode -> ACTIVE"

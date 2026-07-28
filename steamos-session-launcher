@@ -17,6 +17,16 @@ if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
     export TERM=linux
 fi
 
+# Path for SteamOS specific session configurations for Deck users
+STEAMOS_SESSION_CONFIG="/home/$USER/.config/steamos-session/steamos-session-config"
+
+# Load session config if available; otherwise, the script uses the hardcoded defaults below
+if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
+    source "$STEAMOS_SESSION_CONFIG"
+else
+    echo -e "${YLW}WARNING: Session config not found, using built-in defaults${NC}"
+fi
+
 # SteamOS Icon Path
 STEAMOS_ICON="/opt/steamos-session/assets/icons/steamos-session-icon.png"
 
@@ -28,50 +38,7 @@ STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
 clear
 
 # ------------------------------------------------------------------------------
-# 2. DYNAMIC HARDWARE CONFIGURATION LOOKUP
-# ------------------------------------------------------------------------------
-STEAMOS_SESSION_PATH="/opt/steamos-session"
-FALLBACK_CONFIG="${HOME}/.config/steamos-session/steamos-session-config"
-PROFILE_LOADED=0
-
-# Verify our required variables are present
-if [[ -n "$OEM_HARDWARE_PROFILE" && -n "$RESOLUTION_TARGET" ]]; then
-
-    # Build path context: Check if we need to account for NVIDIA driver variations
-    if [[ "$OEM_HARDWARE_PROFILE" == *"nvidia"* ]]; then
-        if [[ "$NVIDIA_OFFICIAL" == "1" ]]; then
-            TARGET_CONFIG="${STEAMOS_SESSION_PATH}/config/session/hardware/${OEM_HARDWARE_PROFILE}/official/${RESOLUTION_TARGET}"
-        else
-            TARGET_CONFIG="${STEAMOS_SESSION_PATH}/config/session/hardware/${OEM_HARDWARE_PROFILE}/nouveau/${RESOLUTION_TARGET}"
-        fi
-    else
-        TARGET_CONFIG="${STEAMOS_SESSION_PATH}/config/session/hardware/${OEM_HARDWARE_PROFILE}/${RESOLUTION_TARGET}"
-    fi
-
-    # Attempt to load the primary target profile
-    if [[ -f "$TARGET_CONFIG" ]]; then
-        source "$TARGET_CONFIG"
-        PROFILE_LOADED=1
-        echo "Successfully loaded profile: $TARGET_CONFIG"
-    else
-        echo "Warning: Desired profile not found at $TARGET_CONFIG"
-    fi
-fi
-
-# Fallback Tier 1: Check user's classic configuration
-if [[ "$PROFILE_LOADED" -eq 0 ]]; then
-    if [[ -f "$FALLBACK_CONFIG" ]]; then
-        source "$FALLBACK_CONFIG"
-        PROFILE_LOADED=1
-        echo "Successfully loaded fallback configuration: $FALLBACK_CONFIG"
-    else
-        echo "Error: Neither targeted profile nor fallback configuration could be resolved!"
-        echo "Proceeding to launch using unoptimized default settings..."
-    fi
-fi
-
-# ------------------------------------------------------------------------------
-# 3. EXECUTION LOGIC (SYSTEM GPU SWITCH)
+# 2. EXECUTION LOGIC (SYSTEM GPU SWITCH)
 # ------------------------------------------------------------------------------
 
 # Show the SteamOS image in the tty terminal
@@ -83,7 +50,7 @@ echo ""
 sleep 3
 
 # ------------------------------------------------------------------------------
-# 4. GAMESCOPE COMPOSITOR SETUP
+# 3. GAMESCOPE COMPOSITOR SETUP
 # ------------------------------------------------------------------------------
 
 # Fallback defaults (prevents Gamescope crash if configs are missing or paths are broken)
@@ -111,7 +78,7 @@ GS_ARGS=(
 )
 
 # ------------------------------------------------------------------------------
-# 5. FINAL LAUNCH (TTY WAYLAND MODE)
+# 4. FINAL LAUNCH (TTY WAYLAND MODE)
 # ------------------------------------------------------------------------------
 
 # Force multiple xwayland sessions to fix bugs
