@@ -12,6 +12,9 @@
 # 1. INITIALIZATION & ARGUMENT PARSING
 # ------------------------------------------------------------------------------
 
+# Clear the screen
+clear
+
 # Check if TERM variable is empty and then set it.
 if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
     export TERM=linux
@@ -33,9 +36,6 @@ STEAMOS_ICON="/opt/steamos-session/assets/icons/steamos-session-icon.png"
 # Define Steam-specific command flags
 # We only use this if SESSION_BINARY ends up being steam
 STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
-
-# Clear The Screen
-clear
 
 # ------------------------------------------------------------------------------
 # 2. EXECUTION LOGIC (SYSTEM GPU SWITCH)
