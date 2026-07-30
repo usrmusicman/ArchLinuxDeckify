@@ -1,6 +1,11 @@
 #!/bin/env bash
 
+# This is user who invoked the sudo command
+REAL_USER=${SUDO_USER:-$USER}
+
+# Base directories for system-wide vs immutable installs
 BASEDIR="/opt/steamos-session"
+BASEDIR_IMMUTABLE="/home/$REAL_USER/.local/bin/steamos-session"
 
 # Set default directory for HARDWARE_CONFIG if not already set by the environment
 HARDWARE_CONFIG="${HARDWARE_CONFIG:-${BASEDIR}/config/session/hardware}"
@@ -10,126 +15,149 @@ if [[ $# -eq 0 ]]; then
 	set -- "--config" "--gui"
 fi
 
-if [[ "$1" == "--deckify" ]]; then
-	cp ${BASEDIR}/config/.bash_profile.deckify ${HOME}/.bash_profile
-	if [[ -x "/usr/bin/plasmalogin" ]]; then
-		sudo systemctl mask plasmalogin.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/gdm" ]]; then
-		sudo systemctl mask gdm.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/lightdm" ]]; then
-		sudo systemctl mask lightdm.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/sddm" ]]; then
-		sudo systemctl mask sddm.service
-		sudo systemctl unmask getty@tty1.service
-		systemctl reboot
-	else
-		echo -e "Display session manager not supported"
-	fi
-elif [[ "$1" == "--normal" ]]; then
-	cp ${BASEDIR}/config/.bash_profile.normal ${HOME}/.bash_profile
-	if [[ -x "/usr/bin/plasmalogin" ]]; then
-		sudo systemctl unmask plasmalogin.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/gdm" ]]; then
-		sudo systemctl unmask gdm.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/lightdm" ]]; then
-		sudo systemctl unmask lightdm.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	elif [[ -x "/usr/bin/sddm" ]]; then
-		sudo systemctl unmask sddm.service
-		sudo systemctl mask getty@tty1.service
-		systemctl reboot
-	else
-		echo -e "Display session manager not supported"
-	fi
-elif [[ "$1" == "--config" ]]; then
-	# 1. Require either --cli or --gui
-	if [[ "$2" == "--cli" ]]; then
-		# Check if a configuration argument was provided
-		if [[ -z "$3" ]]; then
-			# If given no argument, then and ONLY then list the configurations recursively
-			echo -e "Available configurations under ${HARDWARE_CONFIG}:"
-			echo -e "--------------------------------------------------"
+# Helper function to manage display managers and reboot
+manage_services() {
+	local mode="$1"
+	local dm=""
 
-			if [[ -d "${HARDWARE_CONFIG}" ]]; then
-				# Recursively find all files, filtering only those with a bash shebang
-				find "${HARDWARE_CONFIG}" -type f -print0 | while IFS= read -r -d '' file; do
-					if head -n 1 "$file" | grep -q "bash"; then
-						echo -e "Config: $(basename "$file")"
-						echo -e "Path:   $file"
-						echo -e "--------------------------------------------------"
-					fi
-				done
+	if [[ -x "/usr/bin/plasmalogin" ]]; then
+		dm="plasmalogin.service"
+	elif [[ -x "/usr/bin/gdm" ]]; then
+		dm="gdm.service"
+	elif [[ -x "/usr/bin/lightdm" ]]; then
+		dm="lightdm.service"
+	elif [[ -x "/usr/bin/sddm" ]]; then
+		dm="sddm.service"
+	else
+		echo -e "Display session manager not supported"
+		return 1
+	fi
+
+	if [[ "$mode" == "deckify" ]]; then
+		sudo systemctl mask "$dm"
+		sudo systemctl unmask getty@tty1.service
+	else
+		sudo systemctl unmask "$dm"
+		sudo systemctl mask getty@tty1.service
+	fi
+	systemctl reboot
+}
+
+# Parse options
+case "$1" in
+	--system|--immutable)
+		# Determine active base directory
+		if [[ "$1" == "--system" ]]; then
+			ACTIVE_BASEDIR="${BASEDIR}"
+		else
+			ACTIVE_BASEDIR="${BASEDIR_IMMUTABLE}"
+		fi
+
+		# Require second argument: --deckify or --normal
+		case "$2" in
+			--deckify)
+				# Copy appropriate bash profile (fallback to immutable if deckify profile doesn't exist)
+				if [[ -f "${ACTIVE_BASEDIR}/config/.bash_profile.deckify" ]]; then
+					cp "${ACTIVE_BASEDIR}/config/.bash_profile.deckify" "${HOME}/.bash_profile"
+				elif [[ -f "${ACTIVE_BASEDIR}/config/.bash_profile.immutable" ]]; then
+					cp "${ACTIVE_BASEDIR}/config/.bash_profile.immutable" "${HOME}/.bash_profile"
+				else
+					echo -e "Error: Deckify bash profile not found in ${ACTIVE_BASEDIR}/config/"
+					exit 1
+				fi
+				manage_services "deckify"
+				;;
+			--normal)
+				if [[ -f "${ACTIVE_BASEDIR}/config/.bash_profile.normal" ]]; then
+					cp "${ACTIVE_BASEDIR}/config/.bash_profile.normal" "${HOME}/.bash_profile"
+				else
+					echo -e "Error: Normal bash profile not found in ${ACTIVE_BASEDIR}/config/"
+					exit 1
+				fi
+				manage_services "normal"
+				;;
+			*)
+				echo -e "Error: $1 requires either --deckify or --normal as an argument."
+				exit 1
+				;;
+		esac
+		;;
+
+	--config)
+		if [[ "$2" == "--cli" ]]; then
+			# Check if a configuration argument was provided
+			if [[ -z "$3" ]]; then
+				echo -e "Available configurations under ${HARDWARE_CONFIG}:"
+				echo -e "--------------------------------------------------"
+
+				if [[ -d "${HARDWARE_CONFIG}" ]]; then
+					find "${HARDWARE_CONFIG}" -type f -print0 | while IFS= read -r -d '' file; do
+						if head -n 1 "$file" | grep -q "bash"; then
+							echo -e "Config: $(basename "$file")"
+							echo -e "Path:   $file"
+							echo -e "--------------------------------------------------"
+						fi
+					done
+				else
+					echo -e "Error: Directory ${HARDWARE_CONFIG} does not exist."
+					exit 1
+				fi
+				exit 0
+			fi
+			CONFIG_PATH="$3"
+
+		elif [[ "$2" == "--gui" ]]; then
+			if command -v kdialog &> /dev/null; then
+				CONFIG_PATH=$(kdialog --title "Select Hardware Profile" --getopenfilename "${HARDWARE_CONFIG}")
+			elif command -v zenity &> /dev/null; then
+				CONFIG_PATH=$(zenity --file-selection --title="Select Hardware Profile" --filename="${HARDWARE_CONFIG}/")
 			else
-				echo -e "Error: Directory ${HARDWARE_CONFIG} does not exist."
+				echo -e "Error: Neither kdialog nor zenity is installed. Cannot launch GUI."
 				exit 1
 			fi
-			exit 0
-		fi
-		# If an argument is given, treat $3 as the whole path
-		CONFIG_PATH="$3"
 
-	elif [[ "$2" == "--gui" ]]; then
-		# GUI file selection logic: try kdialog first, fallback to zenity
-		if command -v kdialog &> /dev/null; then
-			CONFIG_PATH=$(kdialog --title "Select Hardware Profile" --getopenfilename "${HARDWARE_CONFIG}")
-		elif command -v zenity &> /dev/null; then
-			CONFIG_PATH=$(zenity --file-selection --title="Select Hardware Profile" --filename="${HARDWARE_CONFIG}/")
+			if [[ -z "${CONFIG_PATH}" ]]; then
+				echo -e "File selection canceled. Exiting gracefully."
+				exit 0
+			fi
 		else
-			echo -e "Error: Neither kdialog nor zenity is installed. Cannot launch GUI."
+			echo -e "Error: --config requires either --gui or --cli as an argument."
 			exit 1
 		fi
 
-		# Handle the case where the user cancels the file picker prompt or empty input is returned
-		if [[ -z "${CONFIG_PATH}" ]]; then
-			echo -e "File selection canceled. Exiting gracefully."
-			exit 0
+		# Verify file existence and shebang
+		if [[ ! -f "${CONFIG_PATH}" ]]; then
+			echo -e "Error: Configuration file not found at '${CONFIG_PATH}'."
+			exit 1
 		fi
-	else
-		echo -e "Error: --config requires either --gui or --cli as an argument."
+
+		if ! head -n 1 "${CONFIG_PATH}" | grep -q "bash"; then
+			echo -e "Error: '${CONFIG_PATH}' is not a valid bash script (missing bash shebang)."
+			exit 1
+		fi
+
+		LINK_DIR="${HOME}/.config/steamos-session"
+		mkdir -p "${LINK_DIR}"
+		LINK_PATH="${LINK_DIR}/steamos-session-config"
+		ln -sf "${CONFIG_PATH}" "${LINK_PATH}"
+
+		echo -e "Success: Symlink updated to point to ${CONFIG_PATH}"
+		;;
+
+	--help)
+		echo -e "SteamOS Deckify Toggle"
+		echo -e ""
+		echo -e "--system --deckify     : Setup Steam Deck experience for system install"
+		echo -e "--system --normal      : Setup normal desktop for system install"
+		echo -e "--immutable --deckify  : Setup Steam Deck experience for immutable install"
+		echo -e "--immutable --normal   : Setup normal desktop for immutable install"
+		echo -e "--config --cli [path]  : Link the chosen hardware profile path via CLI (leave path empty to list configs)"
+		echo -e "--config --gui         : Launch a graphical file picker to choose the hardware profile path"
+		echo -e "--help                 : Show this help message"
+		;;
+
+	*)
+		echo -e "Please type in a valid option, use --help for more details"
 		exit 1
-	fi
-
-	# 2. Verify file existence at the specified full path
-	if [[ ! -f "${CONFIG_PATH}" ]]; then
-		echo -e "Error: Configuration file not found at '${CONFIG_PATH}'."
-		exit 1
-	fi
-
-	# 3. Verify that the file is a bash script by checking the first line (shebang)
-	if ! head -n 1 "${CONFIG_PATH}" | grep -q "bash"; then
-		echo -e "Error: '${CONFIG_PATH}' is not a valid bash script (missing bash shebang)."
-		exit 1
-	fi
-
-	# 4. Create symlink target directory if it doesn't exist
-	LINK_DIR="${HOME}/.config/steamos-session"
-	mkdir -p "${LINK_DIR}"
-
-	# 5. Generate/overwrite the symlink
-	LINK_PATH="${LINK_DIR}/steamos-session-config"
-	ln -sf "${CONFIG_PATH}" "${LINK_PATH}"
-
-	echo -e "Success: Symlink updated to point to ${CONFIG_PATH}"
-
-elif [[ "$1" == "--help" ]]; then
-	echo -e "SteamOS Deckify Toggle"
-	echo -e ""
-	echo -e "--deckify: Toggle the steamdeck console setup"
-	echo -e "--normal: Toggle normal install without the gamemode console boot sequence"
-	echo -e "--config --cli [full_path]: Link the chosen hardware profile path (leave empty to list configs)"
-	echo -e "--config --gui: Launch a graphical file picker to choose the hardware profile path"
-	echo -e "--help: Show this help message"
-else
-	echo -e "Please type in a valid option, use --help for more details"
-fi
+		;;
+esac

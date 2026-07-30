@@ -3,7 +3,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 
 # Identify the actual user, even if the script is run with sudo
 TARGET_USER="${SUDO_USER:-$USER}"
-TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+TARGET_HOME="/home/$TARGET_USER"
 
 if [[ "$1" == "--install" ]]; then
 
@@ -53,7 +53,7 @@ if [[ "$1" == "--install" ]]; then
 
     # Ensure correct ownership if installed to user's home directory (Immutable)
     if [[ "$2" == "--immutable" ]]; then
-        sudo chown -R "$TARGET_USER":"$TARGET_USER" "$TARGET_HOME/.local/bin/steamos-session"
+        sudo chown -R "$TARGET_USER":"$TARGET_USER" "$STEAMOS_SESSION_PATH"
     fi
 
     # Safely install sudoers override file
@@ -90,6 +90,9 @@ EOF
 ExecStart=
 ExecStart=-/sbin/agetty --autologin $TARGET_USER --noclear %I 38400 linux
 EOF
+
+    # Enable the autologin on TTY1 service
+    sudo systemctl enable getty@tty1.service
 
     # Install Pacman Hook only if the directory exists (protects against failing on non-Arch systems)
     if [[ -d "/usr/share/libalpm/hooks" ]]; then
@@ -160,13 +163,16 @@ EOF
 elif [[ "$1" == "--uninstall" ]]; then
 
     if [[ "$2" == "--normal" ]]; then
-        sudo rm -rf /opt/steamos-session
+        sudo rm -rf $STEAMOS_SESSION_PATH
     elif [[ "$2" == "--immutable" ]]; then
-        rm -rf "$TARGET_HOME/.local/bin/steamos-session"
+        rm -rf "$STEAMOS_SESSION_PATH"
     else
         echo "Error: Please specify --normal or --immutable"
         exit 1
     fi
+
+    # Disable the autologin on TTY1 service
+    sudo systemctl disable getty@tty1.service
 
     # Clean up system files (using -f to prevent errors if files are already missing)
     sudo rm -f "/etc/mkinitcpio.conf.d/10-performance.conf"
