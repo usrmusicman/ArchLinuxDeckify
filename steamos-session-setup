@@ -7,16 +7,8 @@ TARGET_HOME="/home/$TARGET_USER"
 
 if [[ "$1" == "--install" ]]; then
 
-    if [[ "$2" == "--immutable" ]]; then
-        # Immutable install path targets the user's home directory
-        STEAMOS_SESSION_PATH="$TARGET_HOME/.local/bin/steamos-session"
-    elif [[ "$2" == "--normal" ]]; then
-        # Normal install path
-        STEAMOS_SESSION_PATH="/opt/steamos-session"
-    else
-        echo "Error: Please specify --normal or --immutable"
-        exit 1
-    fi
+    # Normal install path
+    STEAMOS_SESSION_PATH="/opt/steamos-session"
 
     echo "Installing SteamOS Session to $STEAMOS_SESSION_PATH..."
 
@@ -40,7 +32,7 @@ if [[ "$1" == "--install" ]]; then
     sudo install -Dm644 "$PWD/assets/icons/steamos-session-icon.png" "$STEAMOS_SESSION_PATH/assets/icons/steamos-session-icon.png"
 
     # Install Extras
-    if [[ "$3" == "--extras" ]]; then
+    if [[ "$2" == "--extras" ]]; then
         sudo install -dm755 "$STEAMOS_SESSION_PATH/config/session/hardware"
         sudo cp -rvf "$PWD/config/session/hardware/amdgpu-sapphire-rx9070xt" "$STEAMOS_SESSION_PATH/config/session/hardware/"
         sudo cp -rvf "$PWD/config/session/hardware/amdgpu-valve-steamdeck" "$STEAMOS_SESSION_PATH/config/session/hardware/"
@@ -51,31 +43,18 @@ if [[ "$1" == "--install" ]]; then
         sudo cp -rvf "$PWD/config/session/hardware/xe-le-a770" "$STEAMOS_SESSION_PATH/config/session/hardware/"
     fi
 
-    # Ensure correct ownership if installed to user's home directory (Immutable)
-    if [[ "$2" == "--immutable" ]]; then
-        sudo chown -R "$TARGET_USER":"$TARGET_USER" "$STEAMOS_SESSION_PATH"
-    fi
-
     # Safely install sudoers override file
     echo "Configuring sudoers..."
     TMP_SUDOERS=$(mktemp)
 
-    if [[ "$2" == "--immutable" ]]; then
-        cat <<EOF > "$TMP_SUDOERS"
-# SteamOS Enhanced Gamemode
-%wheel ALL=(ALL) NOPASSWD: $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced
-%wheel ALL=(ALL) NOPASSWD: $STEAMOS_SESSION_PATH/steamos-session-immutable-bootstrap
-EOF
-    else
-        cat <<EOF > "$TMP_SUDOERS"
+    cat <<EOF > "$TMP_SUDOERS"
 # SteamOS Enhanced Gamemode
 %wheel ALL=(ALL) NOPASSWD: $STEAMOS_SESSION_PATH/steamos-gamemode-enhanced
 EOF
-    fi
 
     # Validate sudoers syntax before applying to prevent locking out sudo
     if sudo visudo -cf "$TMP_SUDOERS" &>/dev/null; then
-        sudo install -Dm440 "$TMP_SUDOERS" "/etc/sudoers.d/10-steamos-session-overrides"
+        sudo install -Dm440 "$TMP_SUDOERS" "/etc/sudoers.d/100-steamos-session-overrides"
     else
         echo "Sudoers syntax validation failed! Aborting to prevent lockout."
         rm -f "$TMP_SUDOERS"
@@ -162,14 +141,8 @@ EOF
 
 elif [[ "$1" == "--uninstall" ]]; then
 
-    if [[ "$2" == "--normal" ]]; then
-        sudo rm -rf $STEAMOS_SESSION_PATH
-    elif [[ "$2" == "--immutable" ]]; then
-        rm -rf "$STEAMOS_SESSION_PATH"
-    else
-        echo "Error: Please specify --normal or --immutable"
-        exit 1
-    fi
+    # Remove Install (Uninstall)
+    sudo rm -rf $STEAMOS_SESSION_PATH
 
     # Disable the autologin on TTY1 service
     sudo systemctl disable getty@tty1.service
@@ -189,6 +162,6 @@ elif [[ "$1" == "--uninstall" ]]; then
     echo "Uninstallation complete."
 
 else
-    echo "Usage: $0 {--install|--uninstall} {--normal|--immutable} [--extras]"
+    echo "Usage: $0 {--install|--uninstall} [--extras]"
     exit 1
 fi
