@@ -33,14 +33,13 @@ export PROTON_HIDE_NVIDIA_GPU=0
 export WLR_NO_HARDWARE_CURSORS=1
 
 # ------------------------------------------------
-# Gamemode Enhanced Settings
+# IRQ Settings
 # ------------------------------------------------
 
 # Set IRQ threads up to a value 97 is acceptable
 export RT_PRIO_USB=95
-export RT_PRIO_PIPEWIRE=90
-export RT_PRIO_BT=85
-export RT_PRIO_SOUND=80
+export RT_PRIO_SOUND=90
+export RT_PRIO_PIPEWIRE=85
 
 # ------------------------------------------------
 # Experimental Features (Uncomment)

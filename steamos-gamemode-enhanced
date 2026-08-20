@@ -41,9 +41,8 @@ fi
 # --------------------------
 GPU_SETUP=${GPU_SETUP:-generic}
 RT_PRIO_USB=${RT_PRIO_USB:-90}       # Priority for USB host controllers (Controllers/Mice)
-RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-85} # Priority for PipeWire audio daemon
-RT_PRIO_BT=${RT_PRIO_BT:-80}        # Priority for Bluetooth kernel threads
-RT_PRIO_SOUND=${RT_PRIO_SOUND:-75}   # Priority for Sound Card hardware interrupts
+RT_PRIO_PIPEWIRE=${RT_PRIO_PIPEWIRE:-90} # Priority for PipeWire audio daemon
+RT_PRIO_SOUND=${RT_PRIO_SOUND:-85}   # Priority for Sound Card hardware interrupts
 
 # --------------------------
 # SYSTEM STATUS MODULE (-i)
@@ -59,7 +58,20 @@ display_status() {
 
     echo -e "\n${YLW}=== ENVIRONMENT ===${NC}"
     echo -e "${GRN}Active User:${NC} $REAL_USER (UID: $user_uid)"
-    echo -e "${GRN}CPU Profile & Governor:${NC} $cpu_gov"
+
+    echo -e "\n${YLW}=== AUDIO & SYSTEM DAEMONS ===${NC}"
+    echo -e "------------------------------------------------------------"
+    printf "  %-10s | %-10s | %-30s\n" "PID" "RT PRIO" "COMMAND"
+    echo -e "------------------------------------------------------------"
+
+    # Display software stack (PipeWire, WirePlumber, Bluetooth, RTKit)
+    ps -eo pid,rtprio,comm | grep -iE "^ *[0-9]+ +([0-9]+|-) +(pipewire|wireplumber|rtkit-daemon)" | sort -k2 -nr | while read -r pid rtprio comm; do
+        if [[ "$rtprio" != "-" ]]; then
+            printf "  %-10s | %-10s | %-30s\n" "$pid" "$rtprio" "$comm"
+        else
+            printf "  %-10s | %-10s | %-30s\n" "$pid" "0 (TS)" "$comm"
+        fi
+    done
 
     echo -e "\n${YLW}=== THREADED IRQs (Interrupt Requests) ===${NC}"
     echo -e "Displaying hardware interrupts sorted by Real-Time (RT) Priority:"
@@ -67,12 +79,11 @@ display_status() {
     printf "  %-10s | %-10s | %-30s\n" "PID" "RT PRIO" "COMMAND"
     echo -e "------------------------------------------------------------"
 
-    # Fetch process list, filtering for hardware-critical threads
-    ps -eo pid,rtprio,comm | grep -iE "^ *[0-9]+ +([0-9]+|-) +(irq/|xhci|nvme|snd|wireplumber|rtkit-daemon|bluetooth)" | sort -k2 -nr | head -n 25 | while read -r pid rtprio comm; do
+    # Fetch hardware IRQ process list
+    ps -eo pid,rtprio,comm | grep -iE "^ *[0-9]+ +([0-9]+|-) +(irq/|xhci|nvme|snd)" | sort -k2 -nr | head -n 35 | while read -r pid rtprio comm; do
         if [[ "$rtprio" != "-" ]]; then
             printf "  %-10s | %-10s | %-30s\n" "$pid" "$rtprio" "$comm"
         else
-            # TS indicates Time Sharing (Standard priority)
             printf "  %-10s | %-10s | %-30s\n" "$pid" "0 (TS)" "$comm"
         fi
     done
@@ -268,27 +279,28 @@ manage_gpu() {
     esac
 }
 
-# Manage CPU Governor
-manage_cpu_governor() {
-    if [[ "$1" == "on" ]]; then
-        echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null
-        confirm "CPU Governor -> performance"
-    else
-        echo powersave | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null
-        confirm "CPU Governor -> powersave"
-    fi
-}
-
 # Manage eBPF custom schedulers (SCX)
 start_scheduler() {
-    local sched=${SCHED_NAME:-lavd}
-    local mode=${SCHED_MODE:-lowlatency}
+    local sched=${SCHED_NAME}
 
     if command -v scxctl &>/dev/null; then
-        scxctl stop >/dev/null 2>&1
-        sleep 0.2
-        scxctl start --sched "$sched" --mode "$mode" >/dev/null 2>&1 &
-        confirm "Scheduler -> $sched (Mode: $mode)"
+        case "$sched" in
+            lavd)
+                scxctl stop >/dev/null 2>&1
+                sleep 0.2
+                scxctl start --sched lavd --args="--performance" >/dev/null 2>&1
+                confirm "Scheduler -> lavd (Args: --performance)"
+                ;;
+            bpfland)
+                scxctl stop >/dev/null 2>&1
+                sleep 0.2
+                scxctl start --sched bpfland --args="-m,performance,-s,5000" >/dev/null 2>&1
+                confirm "Scheduler -> bpfland (Args: -m,performance,-s,5000)"
+                ;;
+            *)
+                echo "Choose either the bpfland or lavd cpu task schedulers!"
+                ;;
+        esac
     fi
 }
 
@@ -302,7 +314,6 @@ revert_defaults() {
     manage_usb off
     manage_gpu off
     manage_thp off
-    manage_cpu_governor off
 
     if command -v scxctl &>/dev/null; then
         scxctl stop >/dev/null 2>&1
@@ -327,29 +338,14 @@ show_help() {
     echo -e "\n${CYN}CORE OPTIONS:${NC}"
     echo -e "  ${YLW}-s <scheduler>${NC} Injects a custom eBPF scheduler via SCX. Overrides the default"
     echo -e "                  CFS scheduler in the Linux Kernel. (Default: lavd)"
-    echo -e "  ${YLW}-m <mode>${NC}      Applies a specific behavioral profile to the chosen SCX scheduler."
-    echo -e "                  (Default: lowlatency)"
     echo -e "  ${YLW}-i${NC}              Displays current Audio settings, sample rates, and an"
     echo -e "                  active hardware Interrupt Request (IRQ) thread breakdown."
     echo -e "  ${YLW}-x${NC}              Restores all hardware governors, schedulers, and powersave states."
     echo -e "  ${YLW}-h${NC}              Shows this verbose help message."
 
     echo -e "\n${YLW}--- SCX Schedulers (eBPF) ---${NC}"
-    echo -e "  * ${GRN}beerland${NC}   - High-throughput, heavy compilation/IO tasks."
     echo -e "  * ${GRN}bpfland${NC}    - Direct BPF, minimal scheduling overhead."
-    echo -e "  * ${GRN}cosmos${NC}     - High-performance general-purpose."
-    echo -e "  * ${GRN}flash${NC}      - Ultra-aggressive preemption. Maximum responsiveness, low efficiency."
     echo -e "  * ${GRN}lavd${NC}       - Latency-critical Auto-Vblank (Best for Audio)."
-    echo -e "  * ${GRN}p2dq${NC}       - Power-aware Dual Queue (Balanced laptops)."
-    echo -e "  * ${GRN}rustland${NC}   - High-safety BPF written in Rust."
-    echo -e "  * ${GRN}rusty${NC}      - Efficient modern scheduler for highly interactive multicore desktop use."
-    echo -e "  * ${GRN}tickless${NC}   - Reduced timer interrupts for CPU consistency."
-
-    echo -e "\n${YLW}--- Supported Mode Profiles ---${NC}"
-    echo -e "  * ${CYN}gaming${NC}      - Prioritizes foreground task vblank sync to prevent stutter."
-    echo -e "  * ${CYN}lowlatency${NC}  - Favors absolute lowest scheduling delay for RT audio apps."
-    echo -e "  * ${CYN}powersave${NC}   - Efficient, battery-friendly mode."
-    echo -e "  * ${CYN}balanced${NC}    - Standard desktop responsiveness."
 
     echo -e "\n${YLW}--- GPU Setup Options (Editable in config) ---${NC}"
     echo -e "  * ${CYN}nvidia${NC}          - Dedicated NVIDIA GPU"
@@ -360,8 +356,8 @@ show_help() {
 
     echo -e "\n${YLW}--- RT Priority Defaults (Editable in config) ---${NC}"
     echo -e "  USB       : ${CYN}$RT_PRIO_USB${NC}"
-    echo -e "  Bluetooth : ${CYN}$RT_PRIO_BT${NC}"
-    echo -e "  Sound IRQ : ${CYN}$RT_PRIO_SOUND${NC}"
+    echo -e "  PIPEWIRE  : ${CYN}$RT_PRIO_PIPEWIRE${NC}"
+    echo -e "  ONBOARD   : ${CYN}$RT_PRIO_SOUND${NC}"
 
     echo -e "----------------------------------------------------------------------"
     exit 0
@@ -378,10 +374,9 @@ show_help() {
 trap revert_defaults SIGINT SIGTERM
 
 # Parse arguments
-while getopts "s:m:p:q:r:l:ixh" opt; do
+while getopts "s:ixh" opt; do
     case "$opt" in
         s) SCHED_NAME=$OPTARG ;;
-        m) SCHED_MODE=$OPTARG ;;
         i) display_status ;;
         x) revert_defaults; exit 0 ;;
         h) show_help ;;
@@ -398,7 +393,6 @@ manage_pipewire on
 manage_soundcards on
 manage_usb on
 manage_gpu on
-manage_cpu_governor on
 start_scheduler
 
 notify "Performance Mode -> ACTIVE"

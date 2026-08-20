@@ -26,7 +26,7 @@ export DESKTOP_AUTOLOGIN="startplasma-wayland"
 if [ "$(tty)" = "/dev/tty1" ]; then
     udiskie-mount -a
     clear
-    sudo $STEAMOS_GAMEMODE -s lavd -m gaming
+    sudo $STEAMOS_GAMEMODE -s lavd
     clear
     $STEAMOS_SESSION_LAUNCHER
     clear
