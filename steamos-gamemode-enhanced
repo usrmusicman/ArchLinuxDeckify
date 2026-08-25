@@ -104,7 +104,7 @@ manage_sysctl() {
         sysctl -q -w vm.max_map_count=1048576
         sysctl -q -w net.core.netdev_max_backlog=5000
         sysctl -q -w net.ipv4.tcp_fastopen=3
-        sysctl -q -w kernel.sched_rt_runtime_us=-1
+        sysctl -q -w kernel.sched_rt_runtime_us=980000
         sysctl -q -w kernel.numa_balancing=0
         sysctl -q -w vm.stat_interval=10
         sysctl -q -w kernel.timer_migration=0
@@ -130,9 +130,9 @@ manage_sysctl() {
 manage_thp() {
     if [[ -f "/sys/kernel/mm/transparent_hugepage/enabled" ]] && [[ -f "/sys/kernel/mm/transparent_hugepage/defrag" ]]; then
         if [[ "$1" == "on" ]]; then
-            echo never | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null
-            echo never | tee /sys/kernel/mm/transparent_hugepage/defrag >/dev/null
-            confirm "THP -> Disabled (Optimized for gaming consistency)"
+            echo madvise | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null
+            echo madvise | tee /sys/kernel/mm/transparent_hugepage/defrag >/dev/null
+            confirm "THP -> Set to madvise (Optimized for gaming consistency)"
         else
             echo always | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null
             confirm "THP -> Enabled (Default)"
