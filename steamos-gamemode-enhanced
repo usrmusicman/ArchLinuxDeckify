@@ -351,8 +351,6 @@ show_help() {
     echo -e "  -s <sched>  Select eBPF scheduler (lavd | bpfland | off). Default: lavd"
     echo -e "  -i          Display current system priority & IRQ status"
     echo -e "  -h          Show this help message"
-    echo -e "\nSteam Launch Options Usage:"
-    echo -e "  sudo /path/to/script.sh -s lavd -- %command%"
     exit 0
 }
 
@@ -367,7 +365,7 @@ show_help() {
 trap 'start_scheduler off' SIGINT SIGTERM
 
 # Parse arguments
-while getopts "s:3:i:x:h" opt; do
+while getopts "s:ih" opt; do
     case "$opt" in
         s) SCHED_NAME=$OPTARG start_scheduler on ;;
         i) display_status ;;
