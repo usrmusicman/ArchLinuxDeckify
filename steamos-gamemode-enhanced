@@ -105,22 +105,28 @@ manage_sysctl() {
         sysctl -q -w net.core.netdev_max_backlog=5000
         sysctl -q -w net.ipv4.tcp_fastopen=3
         sysctl -q -w kernel.sched_rt_runtime_us=980000
-        sysctl -q -w kernel.numa_balancing=0
         sysctl -q -w vm.stat_interval=10
         sysctl -q -w kernel.timer_migration=0
+
+        # Network latency tuning (Optional but great for multiplayer)
+        sysctl -q -w net.core.rmem_max=16777216
+        sysctl -q -w net.core.wmem_max=16777216
 
         confirm "Sysctl -> Gamemode Enhanced profile applied"
     else
         # Revert to Arch Linux standard kernel/systemd defaults
         sysctl -q -w vm.swappiness=60
         sysctl -q -w vm.vfs_cache_pressure=100
-        sysctl -q -w vm.max_map_count=1048576  # Modern systemd standard
+        sysctl -q -w vm.max_map_count=1048576
         sysctl -q -w net.core.netdev_max_backlog=1000
         sysctl -q -w net.ipv4.tcp_fastopen=1
         sysctl -q -w kernel.sched_rt_runtime_us=950000
-        sysctl -q -w kernel.numa_balancing=0
         sysctl -q -w vm.stat_interval=1
         sysctl -q -w kernel.timer_migration=1
+
+        # Restore stock network buffers
+        sysctl -q -w net.core.rmem_max=212992
+        sysctl -q -w net.core.wmem_max=212992
 
         confirm "Sysctl -> Restored to Arch Linux defaults"
     fi
@@ -286,16 +292,46 @@ start_scheduler() {
     if command -v scxctl &>/dev/null; then
         case "$sched" in
             lavd)
+                notify "Engaging Performance Mode..."
                 scxctl stop >/dev/null 2>&1
                 sleep 0.2
                 scxctl start --sched lavd --args="--performance" >/dev/null 2>&1
+                manage_sysctl on
+                manage_thp on
+                manage_wifi on
+                manage_pipewire on
+                manage_soundcards on
+                manage_usb on
+                manage_gpu on
                 confirm "Scheduler -> lavd (Args: --performance)"
+                notify "Performance Mode -> ACTIVE"
                 ;;
             bpfland)
+                notify "Engaging Performance Mode..."
                 scxctl stop >/dev/null 2>&1
                 sleep 0.2
                 scxctl start --sched bpfland --args="-m,performance,-s,5000" >/dev/null 2>&1
+                manage_sysctl on
+                manage_thp on
+                manage_wifi on
+                manage_pipewire on
+                manage_soundcards on
+                manage_usb on
+                manage_gpu on
                 confirm "Scheduler -> bpfland (Args: -m,performance,-s,5000)"
+                notify "Performance Mode -> ACTIVE"
+                ;;
+            off)
+                notify "Restoring system defaults..."
+                manage_sysctl off
+                manage_thp off
+                manage_wifi off
+                manage_pipewire off
+                manage_soundcards off
+                manage_usb off
+                manage_gpu off
+                confirm "Scheduler -> Off"
+                notify "Normal Mode -> ACTIVE"
                 ;;
             *)
                 echo "Choose either the bpfland or lavd cpu task schedulers!"
@@ -304,62 +340,19 @@ start_scheduler() {
     fi
 }
 
-# Restore system to standard operational state
-revert_defaults() {
-    notify "Restoring system defaults..."
-    manage_sysctl off
-    manage_wifi off
-    manage_pipewire off
-    manage_soundcards off
-    manage_usb off
-    manage_gpu off
-    manage_thp off
-
-    if command -v scxctl &>/dev/null; then
-        scxctl stop >/dev/null 2>&1
-        confirm "Scheduler -> Default Kernel CFS Restored"
-    fi
-
-    notify "Normal Mode -> ACTIVE"
-}
-
 # --------------------------
 # VERBOSE HELP FUNCTION (-h)
 # --------------------------
 show_help() {
     echo -e "${YLW}Linux Gamemode Enhanced (High-Performance Audio & Gaming Wrapper)${NC}"
     echo -e "----------------------------------------------------------------------"
-    echo -e "This script forcibly overrides system parameters to prioritize low-latency"
-    echo -e "audio processing, controller polling, and raw GPU performance. It interacts"
-    echo -e "directly with hardware governors, process scheduling, and PipeWire APIs."
-
-    echo -e "\n${GRN}USAGE:${NC} sudo $0 [OPTIONS]"
-
-    echo -e "\n${CYN}CORE OPTIONS:${NC}"
-    echo -e "  ${YLW}-s <scheduler>${NC} Injects a custom eBPF scheduler via SCX. Overrides the default"
-    echo -e "                  CFS scheduler in the Linux Kernel. (Default: lavd)"
-    echo -e "  ${YLW}-i${NC}              Displays current Audio settings, sample rates, and an"
-    echo -e "                  active hardware Interrupt Request (IRQ) thread breakdown."
-    echo -e "  ${YLW}-x${NC}              Restores all hardware governors, schedulers, and powersave states."
-    echo -e "  ${YLW}-h${NC}              Shows this verbose help message."
-
-    echo -e "\n${YLW}--- SCX Schedulers (eBPF) ---${NC}"
-    echo -e "  * ${GRN}bpfland${NC}    - Direct BPF, minimal scheduling overhead."
-    echo -e "  * ${GRN}lavd${NC}       - Latency-critical Auto-Vblank (Best for Audio)."
-
-    echo -e "\n${YLW}--- GPU Setup Options (Editable in config) ---${NC}"
-    echo -e "  * ${CYN}nvidia${NC}          - Dedicated NVIDIA GPU"
-    echo -e "  * ${CYN}nvidia_hybrid${NC}   - NVIDIA + Integrated GPU (Hybrid)"
-    echo -e "  * ${CYN}nvidia_nvk${NC}      - NVIDIA with FOSS driver (Nouveau)"
-    echo -e "  * ${CYN}amd${NC}             - Dedicated AMD GPU"
-    echo -e "  * ${CYN}intel${NC}           - Integrated Intel GPU"
-
-    echo -e "\n${YLW}--- RT Priority Defaults (Editable in config) ---${NC}"
-    echo -e "  USB       : ${CYN}$RT_PRIO_USB${NC}"
-    echo -e "  PIPEWIRE  : ${CYN}$RT_PRIO_PIPEWIRE${NC}"
-    echo -e "  ONBOARD   : ${CYN}$RT_PRIO_SOUND${NC}"
-
-    echo -e "----------------------------------------------------------------------"
+    echo -e "Usage: sudo $0 [OPTIONS] [-- COMMAND [ARGS...]]"
+    echo -e "\nOptions:"
+    echo -e "  -s <sched>  Select eBPF scheduler (lavd | bpfland | off). Default: lavd"
+    echo -e "  -i          Display current system priority & IRQ status"
+    echo -e "  -h          Show this help message"
+    echo -e "\nSteam Launch Options Usage:"
+    echo -e "  sudo /path/to/script.sh -s lavd -- %command%"
     exit 0
 }
 
@@ -371,28 +364,13 @@ show_help() {
 [[ $EUID -ne 0 ]] && { echo -e "${RED}ERROR: Run with sudo.${NC}"; exit 1; }
 
 # This ensures that even if the script crashes or is killed, defaults return.
-trap revert_defaults SIGINT SIGTERM
+trap 'start_scheduler off' SIGINT SIGTERM
 
 # Parse arguments
-while getopts "s:ixh" opt; do
+while getopts "s:3:i:x:h" opt; do
     case "$opt" in
-        s) SCHED_NAME=$OPTARG ;;
+        s) SCHED_NAME=$OPTARG start_scheduler on ;;
         i) display_status ;;
-        x) revert_defaults; exit 0 ;;
-        h) show_help ;;
         *) show_help ;;
     esac
 done
-
-# Activating Overrides
-notify "Engaging Performance Mode..."
-manage_sysctl on
-manage_thp on
-manage_wifi on
-manage_pipewire on
-manage_soundcards on
-manage_usb on
-manage_gpu on
-start_scheduler
-
-notify "Performance Mode -> ACTIVE"

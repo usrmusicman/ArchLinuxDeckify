@@ -30,7 +30,7 @@ if [ "$(tty)" = "/dev/tty1" ]; then
     clear
     $STEAMOS_SESSION_LAUNCHER
     clear
-    sudo $STEAMOS_GAMEMODE -x
+    sudo $STEAMOS_GAMEMODE -s off
     clear
     $DESKTOP_AUTOLOGIN
     clear
