@@ -95,59 +95,6 @@ display_status() {
 # CORE FUNCTIONS
 # --------------------------
 
-# Manage Kernel Sysctl Tunables for Gaming
-manage_sysctl() {
-    if [[ "$1" == "on" ]]; then
-        # Apply performance tunables
-        sysctl -q -w vm.swappiness=1
-        sysctl -q -w vm.vfs_cache_pressure=50
-        sysctl -q -w vm.max_map_count=1048576
-        sysctl -q -w net.core.netdev_max_backlog=5000
-        sysctl -q -w net.ipv4.tcp_fastopen=3
-        sysctl -q -w kernel.sched_rt_runtime_us=980000
-        sysctl -q -w vm.stat_interval=10
-        sysctl -q -w kernel.timer_migration=0
-
-        # Network latency tuning (Optional but great for multiplayer)
-        sysctl -q -w net.core.rmem_max=16777216
-        sysctl -q -w net.core.wmem_max=16777216
-
-        confirm "Sysctl -> Gamemode Enhanced profile applied"
-    else
-        # Revert to Arch Linux standard kernel/systemd defaults
-        sysctl -q -w vm.swappiness=60
-        sysctl -q -w vm.vfs_cache_pressure=100
-        sysctl -q -w vm.max_map_count=1048576
-        sysctl -q -w net.core.netdev_max_backlog=1000
-        sysctl -q -w net.ipv4.tcp_fastopen=1
-        sysctl -q -w kernel.sched_rt_runtime_us=950000
-        sysctl -q -w vm.stat_interval=1
-        sysctl -q -w kernel.timer_migration=1
-
-        # Restore stock network buffers
-        sysctl -q -w net.core.rmem_max=212992
-        sysctl -q -w net.core.wmem_max=212992
-
-        confirm "Sysctl -> Restored to Arch Linux defaults"
-    fi
-}
-
-# Manage Transparent Hugepages (THP) - Disabling can reduce frame-time stuttering
-manage_thp() {
-    if [[ -f "/sys/kernel/mm/transparent_hugepage/enabled" ]] && [[ -f "/sys/kernel/mm/transparent_hugepage/defrag" ]]; then
-        if [[ "$1" == "on" ]]; then
-            echo madvise | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null
-            echo madvise | tee /sys/kernel/mm/transparent_hugepage/defrag >/dev/null
-            confirm "THP -> Set to madvise (Optimized for gaming consistency)"
-        else
-            echo always | tee /sys/kernel/mm/transparent_hugepage/enabled >/dev/null
-            confirm "THP -> Enabled (Default)"
-        fi
-    else
-        confirm "${RED}ERROR: Transparent hugepage files not found.${NC}"
-    fi
-}
-
 # Toggle WiFi power management to ensure low latency for online gaming
 manage_wifi() {
     local p_state=$([[ "$1" == "on" ]] && echo "off" || echo "on")
@@ -296,8 +243,6 @@ start_scheduler() {
                 scxctl stop >/dev/null 2>&1
                 sleep 0.2
                 scxctl start --sched lavd --args="--performance" >/dev/null 2>&1
-                manage_sysctl on
-                manage_thp on
                 manage_wifi on
                 manage_pipewire on
                 manage_soundcards on
@@ -311,8 +256,6 @@ start_scheduler() {
                 scxctl stop >/dev/null 2>&1
                 sleep 0.2
                 scxctl start --sched bpfland --args="-m,performance,-s,5000" >/dev/null 2>&1
-                manage_sysctl on
-                manage_thp on
                 manage_wifi on
                 manage_pipewire on
                 manage_soundcards on
@@ -323,8 +266,6 @@ start_scheduler() {
                 ;;
             off)
                 notify "Restoring system defaults..."
-                manage_sysctl off
-                manage_thp off
                 manage_wifi off
                 manage_pipewire off
                 manage_soundcards off
