@@ -5,13 +5,16 @@ BASEDIR="/opt/steamos-session"
 # Set default directory for HARDWARE_CONFIG if not already set by the environment
 HARDWARE_CONFIG="${HARDWARE_CONFIG:-${BASEDIR}/config/session/hardware}"
 
+# Get the real user running sudo
+REAL_USER="${SUDO_USER:-${USER}}"
+
 # If no arguments are provided (e.g., clicked from a file manager), default to --config --gui
 if [[ $# -eq 0 ]]; then
     set -- "--config" "--gui"
 fi
 
 if [[ "$1" == "--deckify" ]]; then
-    cp ${BASEDIR}/config/bash/.bash_profile.deckify ${HOME}/.bash_profile
+    cp ${BASEDIR}/config/bash/.bash_profile.deckify /home/${REAL_USER}/.bash_profile
     if [[ -x "/usr/bin/plasmalogin" ]]; then
         sudo systemctl mask plasmalogin.service
         sudo systemctl unmask getty@tty1.service
@@ -32,7 +35,7 @@ if [[ "$1" == "--deckify" ]]; then
         echo -e "Display session manager not supported"
     fi
 elif [[ "$1" == "--normal" ]]; then
-    cp ${BASEDIR}/config/bash/.bash_profile.normal ${HOME}/.bash_profile
+    cp ${BASEDIR}/config/bash/.bash_profile.normal /home/${REAL_USER}/.bash_profile
     if [[ -x "/usr/bin/plasmalogin" ]]; then
         sudo systemctl unmask plasmalogin.service
         sudo systemctl mask getty@tty1.service
