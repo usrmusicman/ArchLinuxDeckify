@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=ESDE Session
+GenericName=Session Launcher
+Comment=A launcher for the ESDE session
+Icon=/opt/steamos-session/assets/icons/steamos-session-icon.png
+TryExec=/opt/steamos-session/modules/session-esde
+Exec=/opt/steamos-session/modules/session-esde
+Terminal=false
+Categories=Game;
+StartupWMClass=session-esde

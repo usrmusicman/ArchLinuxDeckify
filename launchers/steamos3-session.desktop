@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=SteamOS Session
+GenericName=Session Launcher
+Comment=A launcher for the SteamOS session
+Icon=/opt/steamos-session/assets/icons/steamos-session-icon.png
+TryExec=/opt/steamos-session/modules/session-deckify
+Exec=/opt/steamos-session/modules/session-deckify
+Terminal=false
+Categories=Game;
+StartupWMClass=session-esde

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+# Binary base path
+BASEDIR="/opt/steamos-session"
+
+# Setup a normal session
+cp ${BASEDIR}/config/bash/.bash_profile.normal ${HOME}/.bash_profile
+if [[ -x "/usr/bin/plasmalogin" ]]; then
+    sudo systemctl unmask plasmalogin.service
+    sudo systemctl mask getty@tty1.service
+    systemctl reboot
+elif [[ -x "/usr/bin/gdm" ]]; then
+    sudo systemctl unmask gdm.service
+    sudo systemctl mask getty@tty1.service
+    systemctl reboot
+elif [[ -x "/usr/bin/lightdm" ]]; then
+    sudo systemctl unmask lightdm.service
+    sudo systemctl mask getty@tty1.service
+    systemctl reboot
+elif [[ -x "/usr/bin/sddm" ]]; then
+    sudo systemctl unmask sddm.service
+    sudo systemctl mask getty@tty1.service
+    systemctl reboot
+else
+    echo -e "Display session manager not supported"
+fi
