@@ -8,5 +8,5 @@ Icon=/opt/steamos-session/assets/icons/steamos-session-icon.png
 TryExec=/opt/steamos-session/modules/session-deckify
 Exec=/opt/steamos-session/modules/session-deckify
 Terminal=false
-Categories=Game;
+Categories=System;
 StartupWMClass=session-esde
