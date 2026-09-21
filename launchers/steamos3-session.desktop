@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=SteamOS Session
-GenericName=Session Launcher
+Name=Deckify (SteamOS Setup)
+GenericName=Setup Launcher
 Comment=A launcher for the SteamOS session
 Icon=/opt/steamos-session/assets/icons/steamos-session-icon.png
 TryExec=/opt/steamos-session/modules/session-deckify
