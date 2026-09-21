@@ -76,7 +76,6 @@ GS_ARGS=(
   "--steam"                 # Integration with Steam UI
   "--xwayland-count" "2"    # Spin up multiple Xwayland instances
   "--hdr-enabled"           # Enable HDR Support
-  "--hdr-sdr-content-nikits" "300" # Calibrates SDR game brightness inside HDR mode
 )
 
 # ------------------------------------------------------------------------------
