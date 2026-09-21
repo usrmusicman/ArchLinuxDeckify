@@ -127,7 +127,7 @@ manage_pipewire() {
 
 manage_soundcards() {
     # Identify PIDs for Intel HDA and AMD ACP (onboard audio controllers)
-    local sound_irqs=$(pgrep -f "irq/.*(snd_hda_intel|snd_acp)")
+    local sound_irqs=$(pgrep -f "irq/.*(snd_hda_intel|snd_acp|snd_usb_audio)")
 
     if [[ "$1" == "on" ]]; then
         # Check if any PIDs were actually found to avoid empty loop errors
