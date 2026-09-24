@@ -8,7 +8,7 @@ cp ${BASEDIR}/config/bash/.bash_profile.deckify ${HOME}/.bash_profile
 if [[ -x "/usr/bin/plasmalogin" ]]; then
     sudo systemctl mask plasmalogin.service
     sudo systemctl unmask getty@tty1.service
-    #systemctl reboot
+    systemctl reboot
 elif [[ -x "/usr/bin/gdm" ]]; then
     sudo systemctl mask gdm.service
     sudo systemctl unmask getty@tty1.service
