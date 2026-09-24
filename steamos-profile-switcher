@@ -3,7 +3,7 @@
 # ==============================================================================
 # UNIFIED STEAMOS SESSION PROFILE CONFIGURATOR (2026 EDITION)
 # ==============================================================================
-# Usage: ./profile-switcher.sh [amd|deck|nvidia-foss|nvidia-prop|nvidia-hybrid|intel]
+# Usage: ./profile-switcher.sh [amd|deck|fallback|nvidia-foss|nvidia-prop|nvidia-hybrid|intel]
 # This script writes a targeted configuration layer to the SteamOS session config.
 # ==============================================================================
 
@@ -14,7 +14,7 @@ PROFILE="${1,,}" # Convert input parameter to lowercase
 
 if [[ -z "$PROFILE" ]]; then
     echo "Error: Please specify a hardware profile target."
-    echo "Available choices: amd, deck, intel, nvidia-foss, nvidia-prop, nvidia-hybrid"
+    echo "Available choices: amd, deck, fallback, intel, nvidia-foss, nvidia-prop, nvidia-hybrid"
     exit 1
 fi
 
@@ -40,7 +40,7 @@ fi
             echo "export RENDER_WIDTH=1280"
             echo "export RENDER_HEIGHT=800"
             ;;
-        "amd"|"intel"|"nvidia-foss"|"nvidia-prop"|"nvidia-hybrid")
+        "amd"|"fallback"|"intel"|"nvidia-foss"|"nvidia-prop"|"nvidia-hybrid")
             echo "export SCREENWIDTH=1920"
             echo "export SCREENHEIGHT=1080"
             echo "export REFRESHRATE=60"
@@ -84,6 +84,9 @@ fi
             echo "export mesa_glthread=true"
             echo "export RADV_PERFTEST=sam"
             echo "export RADV_SHADER_CACHE=1"
+            ;;
+        "fallback")
+            echo "export mesa_glthread=true"
             ;;
         "nvidia-foss")
             echo "export MESA_LOADER_DRIVER_OVERRIDE=nouveau"
@@ -170,6 +173,9 @@ fi
     case "$PROFILE" in
         "amd"|"deck")
             echo -e "echo -e \"\${RED}Starting steam with AMD GPU optimizations...\${NC}\""
+            ;;
+        "fallback")
+            echo -e "echo -e \"\${MAGENTA}Starting steam with fallback optimizations...\${NC}\""
             ;;
         "nvidia-foss")
             echo -e "echo -e \"\${YELLOW}Starting steam with Nvidia FOSS GPU drivers and nouveau optimizations...\${NC}\""
