@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+
+# ==============================================================================
+# UNIFIED STEAMOS SESSION PROFILE CONFIGURATOR (2026 EDITION)
+# ==============================================================================
+# Usage: ./profile-switcher.sh [amd|deck|nvidia-foss|nvidia-prop|nvidia-hybrid|intel]
+# This script writes a targeted configuration layer to the SteamOS session config.
+# ==============================================================================
+
+TARGET_CONFIG="/home/$USER/.config/steamos-session/steamos-session-config"
+mkdir -p "$(dirname "$TARGET_CONFIG")"
+
+PROFILE="${1,,}" # Convert input parameter to lowercase
+
+if [[ -z "$PROFILE" ]]; then
+    echo "Error: Please specify a hardware profile target."
+    echo "Available choices: amd, deck, intel, nvidia-foss, nvidia-prop, nvidia-hybrid"
+    exit 1
+fi
+
+# ------------------------------------------------------------------------------
+# PROFILE CONFIGURATION GENERATION
+# ------------------------------------------------------------------------------
+
+{
+    echo "#!/usr/bin/env bash"
+    echo "# NO execution, NO sourcing of launchers"
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# MONITOR & UPSCALING & POWER & RTIRQ PRIO & PIPEWIRE AUDIO SESSION SETTINGS"
+    echo "# ------------------------------------------------"
+    echo ""
+
+    # Hardware Specific Target Sizing Mapping
+    case "$PROFILE" in
+        "deck")
+            echo "export SCREENWIDTH=1280"
+            echo "export SCREENHEIGHT=800"
+            echo "export REFRESHRATE=60"
+            echo "export RENDER_WIDTH=1280"
+            echo "export RENDER_HEIGHT=800"
+            ;;
+        "amd"|"intel"|"nvidia-foss"|"nvidia-prop"|"nvidia-hybrid")
+            echo "export SCREENWIDTH=1920"
+            echo "export SCREENHEIGHT=1080"
+            echo "export REFRESHRATE=60"
+            echo "export RENDER_WIDTH=1920"
+            echo "export RENDER_HEIGHT=1080"
+            ;;
+        *)
+            echo "Error: Unrecognized profile '$PROFILE'." >&2
+            exit 1
+            ;;
+    esac
+
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# IRQ Settings"
+    echo "# ------------------------------------------------"
+    echo "export RT_PRIO_USB=95"
+    echo "export RT_PRIO_SOUND=90"
+    echo "export RT_PRIO_PIPEWIRE=85"
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# HDR Brightness Settings in nits (SDR & Inverse Tonemap & HDR)"
+    echo "# ------------------------------------------------"
+    echo "export ENABLE_HDR=0"
+    echo "export HDR_SDR=300"
+    echo "export HDR_TONEMAP=300"
+    echo "export HDR_MAX=800"
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# Hardware Specific Toggles"
+    echo "# ------------------------------------------------"
+
+    # Driver Specific Variables Injector
+    case "$PROFILE" in
+        "amd")
+            echo "export mesa_glthread=true"
+            echo "export RADV_PERFTEST=sam,rt"
+            echo "export RADV_SHADER_CACHE=1"
+            ;;
+        "deck")
+            echo "export mesa_glthread=true"
+            echo "export RADV_PERFTEST=sam"
+            echo "export RADV_SHADER_CACHE=1"
+            ;;
+        "nvidia-foss")
+            echo "export MESA_LOADER_DRIVER_OVERRIDE=nouveau"
+            echo "export NVK_PERFTEST=sam,rt"
+            echo "export mesa_glthread=true"
+            ;;
+        "nvidia-prop"|"nvidia-hybrid")
+            echo "export __GL_MaxFramesAllowed=1"
+            echo "export __GL_GSYNC_ALLOWED=1"
+            echo "export __GL_SHADER_DISK_CACHE=1"
+            echo "export __GL_SHADER_DISK_CACHE_PATH=\"\$HOME/.cache/nvidia\""
+            echo "export __GL_VRR_ALLOWED=1"
+            echo "export __GL_YIELD=\"USLEEP\""
+            echo "export __GL_WRITE_COMBINED_MEMORY=1"
+            echo "export __GLX_VENDOR_LIBRARY_NAME=nvidia"
+            echo "export PROTON_ENABLE_NVAPI=1"
+            echo "export PROTON_HIDE_NVIDIA_GPU=0"
+            ;;
+        "intel")
+            echo "export ANV_ENABLE_FBC=1"
+            echo "export mesa_glthread=true"
+            ;;
+    esac
+
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# Common Proton / Gamescope / Steam defaults"
+    echo "# ------------------------------------------------"
+    echo "export ENABLE_GAMESCOPE_WSI=1"
+
+    # Correcting internal flag based on FOSS Nvidia vs others
+    if [[ "$PROFILE" == "nvidia-foss" ]]; then
+        echo "export PROTON_ENABLE_HDR=0"
+    else
+        echo "export PROTON_ENABLE_HDR=1"
+    fi
+
+    echo "export DXVK_HDR=1"
+    echo "export ENABLE_HDR_WSI=1"
+    echo "export vblank_mode=0"
+    echo "export MESA_VK_WSI_PRESENT_MODE=mailbox"
+    echo "export VKD3D_CONFIG=dxr"
+    echo "export WINENTSYNC=1"
+    echo "export PROTON_USE_NTSYNC=1"
+    echo "export PROTON_USE_WOW64=0"
+
+    if [[ "$PROFILE" == "nvidia-prop" || "$PROFILE" == "nvidia-hybrid" ]]; then
+        echo "export PROTON_NVIDIA_LIBS_NO_32BIT=0"
+    fi
+
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# Font Text Colors"
+    echo "# ------------------------------------------------"
+    echo "export BLUE='\033[1;34m'"
+    echo "export GREEN='\033[1;32m'"
+    echo "export RED='\033[1;31m'"
+    echo "export YELLOW='\033[1;33m'"
+    echo "export TEAL='\033[1;36m'"
+    echo "export MAGENTA='\033[1;35m'"
+    echo "export WHITE='\033[0m'"
+    echo "export NC='\033[0m'"
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# Misc"
+    echo "# ------------------------------------------------"
+    echo "export STEAM_GAMESCOPE_HAS_HDR=1"
+    echo "export STEAM_USE_ANY_CONFIG=1"
+    echo "export XDG_RUNTIME_DIR=/run/user/\$(id -u)"
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# Debugging"
+    echo "# ------------------------------------------------"
+    echo "if [ -z \"\$ENV_LOGGED\" ]; then"
+    echo "    export -p > \"\$HOME/steamos-session-env.log\""
+    echo "    export ENV_LOGGED=1"
+    echo "fi"
+    echo ""
+    echo "# ------------------------------------------------"
+    echo "# Welcome Message"
+    echo "# ------------------------------------------------"
+
+    # Mapped Welcome Messages (Restoring your customized coloring rules)
+    case "$PROFILE" in
+        "amd"|"deck")
+            echo -e "echo -e \"\${RED}Starting steam with AMD GPU optimizations...\${NC}\""
+            ;;
+        "nvidia-foss")
+            echo -e "echo -e \"\${YELLOW}Starting steam with Nvidia FOSS GPU drivers and nouveau optimizations...\${NC}\""
+            ;;
+        "nvidia-hybrid")
+            echo -e "echo -e \"\${TEAL}Starting steam with Nvidia Hybrid GPU optimizations...\${NC}\""
+            ;;
+        "nvidia-prop")
+            echo -e "echo -e \"\${GREEN}Starting steam with Nvidia GPU optimizations...\${NC}\""
+            ;;
+        "intel")
+            echo -e "echo -e \"\${BLUE}Starting steam with Intel GPU optimizations...\${NC}\""
+            ;;
+    esac
+
+} > "$TARGET_CONFIG"
+
+echo "Success: Mapped target settings configuration cleanly onto profile target [$PROFILE]!"

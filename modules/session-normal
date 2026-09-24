@@ -3,8 +3,11 @@
 # Binary base path
 BASEDIR="/opt/steamos-session"
 
+# Get the ussername of the user invoking sudo
+USERNAME="${SUDO_USER:-$USER}"
+
 # Setup a normal session
-cp ${BASEDIR}/config/bash/.bash_profile.normal ${HOME}/.bash_profile
+cp ${BASEDIR}/config/bash/.bash_profile.normal /home/${USERNAME}/.bash_profile
 if [[ -x "/usr/bin/plasmalogin" ]]; then
     sudo systemctl unmask plasmalogin.service
     sudo systemctl mask getty@tty1.service

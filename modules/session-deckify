@@ -3,8 +3,11 @@
 # Binary base path
 BASEDIR="/opt/steamos-session"
 
-# Setup a steamdeck session
-cp ${BASEDIR}/config/bash/.bash_profile.deckify ${HOME}/.bash_profile
+# Get the ussername of the user invoking sudo
+USERNAME="${SUDO_USER:-$USER}"
+
+# Setup a normal session
+cp ${BASEDIR}/config/bash/.bash_profile.normal /home/${USERNAME}/.bash_profile
 if [[ -x "/usr/bin/plasmalogin" ]]; then
     sudo systemctl mask plasmalogin.service
     sudo systemctl unmask getty@tty1.service

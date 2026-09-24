@@ -32,6 +32,10 @@ fi
 : "${SCREENWIDTH:=1280}"
 : "${SCREENHEIGHT:=720}"
 : "${REFRESHRATE:=60}"
+: "${ENABLE_HDR:-0}"
+: "${HDR_SDR:=300}"
+: "${HDR_TONEMAP:=100}"
+: "${HDR_MAX:=800}"
 
 # Using an array to handle arguments cleanly without quoting issues.
 GS_ARGS=(
@@ -44,9 +48,27 @@ GS_ARGS=(
   "--adaptive-sync"         # VRR/G-Sync/FreeSync
   "--immediate-flips"       # Lowest possible latency (Tearing allowed if out of VRR)
   "--force-grab-cursor"     # Prevent mouse escaping the game window
-  "--hdr-enabled"           # Enable HDR Support
+)
+
+# HDR Settings
+HDR_ARGS=(
+  "--hdr-enabled"                   # Enable HDR Support
+  "--hdr-sdr-content-nits=$HDR_SDR" # Max brightness (nits) for SDR Content on HDR
+  "--hdr-itm-sdr-nits=$HDR_TONEMAP" # HDR inverse tonemap, minimum whitepoint (nits) value
+  "--hdr-itm-target-nits=$HDR_MAX"  # Max brightness (nits) for HDR content.
 )
 
 # Steam still requires XWayland for many web-views and older games,
 # so we keep it for Steam.
-gamescope "${GS_ARGS[@]}" "$@"
+
+if [[ ! -z "$ENABLE_HDR" ]]; then
+  if [[ "$ENABLE_HDR" == "0" ]]; then
+    gamescope "${GS_ARGS[@]}" "$@"
+  elif [[ "$ENABLE_HDR" == "1" ]]; then
+    gamescope "${GS_ARGS[@]}" "${HDR_ARGS[@]}" "$@"
+  else
+    echo "Arguments not valid please ensure all inputs are correct"
+  fi
+else
+  echo "Unrecognized value, please type a 0 or 1 for the variable ENABLE_HDR in the steamos-session-config"
+fi
