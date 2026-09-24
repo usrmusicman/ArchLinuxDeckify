@@ -104,9 +104,9 @@ fi
 
 # Launch Gamescope in the background (&) so the script can track its PID and monitor it
 if [[ "$ENABLE_HDR" == "0" ]]; then
-  gamescope "${GS_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS 2>/dev/null &
+  gamescope "${GS_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS 2>/dev/null
 elif [[ "$ENABLE_HDR" == "1" ]]; then
-  gamescope "${GS_ARGS[@]}" "${HDR_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS 2>/dev/null &
+  gamescope "${GS_ARGS[@]}" "${HDR_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS 2>/dev/null
 else
   echo "Arguments not valid please ensure all inputs are correct"
   exit 1

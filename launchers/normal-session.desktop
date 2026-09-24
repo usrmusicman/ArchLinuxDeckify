@@ -8,6 +8,6 @@ Comment=A launcher for the default session
 Icon=/opt/steamos-session/assets/icons/steamos-session-icon.png
 TryExec=/opt/steamos-session/modules/session-deckify
 Exec=/opt/steamos-session/modules/session-normal
-Terminal=false
+Terminal=true
 Categories=System;
 StartupWMClass=session-normal

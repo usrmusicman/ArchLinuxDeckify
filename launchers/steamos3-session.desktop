@@ -1,3 +1,4 @@
+#!/usr/bin/env xdg-open
 [Desktop Entry]
 Type=Application
 Version=1.0
@@ -7,6 +8,6 @@ Comment=A launcher for the SteamOS session
 Icon=/opt/steamos-session/assets/icons/steamos-session-icon.png
 TryExec=/opt/steamos-session/modules/session-deckify
 Exec=/opt/steamos-session/modules/session-deckify
-Terminal=false
+Terminal=true
 Categories=System;
 StartupWMClass=session-esde
