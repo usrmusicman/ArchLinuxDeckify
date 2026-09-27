@@ -25,9 +25,9 @@ export DESKTOP_AUTOLOGIN="startplasma-wayland"
 if [ "$(tty)" = "/dev/tty1" ]; then
     while true; do
         clear
-        $DESKTOP_AUTOLOGIN
-        clear
         $STEAMOS_SESSION_LAUNCHER
+        clear
+        $DESKTOP_AUTOLOGIN
         clear
 
         # Optional: Prevent CPU throttling if the commands fail instantly
