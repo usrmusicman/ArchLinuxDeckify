@@ -80,8 +80,13 @@ HDR_ARGS=(
   "--hdr-itm-target-nits=$HDR_MAX"
 )
 
+# Mount all devices
+udiskie -a
+
+# Run multiple Xwayland instances
 export STEAM_MULTIPLE_XWAYLANDS=1
 
+# Run commands in gamescope
 if [[ "$ENABLE_HDR" == "0" ]]; then
     exec gamescope "${GS_ARGS[@]}" -- "${STEAM_CMD[@]}" "${STEAMOS_FLAGS[@]}"
 elif [[ "$ENABLE_HDR" == "1" ]]; then

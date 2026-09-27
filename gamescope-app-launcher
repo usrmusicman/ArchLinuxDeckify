@@ -61,6 +61,10 @@ HDR_ARGS=(
 # Steam still requires XWayland for many web-views and older games,
 # so we keep it for Steam.
 
+# Mount all devices
+udiskie -a
+
+# Run commands in gamescope
 if [[ ! -z "$ENABLE_HDR" ]]; then
   if [[ "$ENABLE_HDR" == "0" ]]; then
     gamescope "${GS_ARGS[@]}" "$@"
