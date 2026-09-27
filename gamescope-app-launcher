@@ -13,7 +13,7 @@
 # ------------------------------------------------------------------------------
 
 # Path for SteamOS specific session configurations for Deck users
-STEAMOS_SESSION_CONFIG="/home/$USER/.config/steamos-session/steamos-session-config"
+STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
 
 # Load session config if available; otherwise, the script uses the hardcoded defaults below
 if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then

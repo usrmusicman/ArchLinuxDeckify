@@ -1,0 +1,19 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Categories=System;
+Comment[en_CA]=Log out of the current KDE Plasma session
+Comment=Log out of the current KDE Plasma session
+Exec=qdbus org.kde.Shutdown /Shutdown logout
+GenericName[en_CA]=
+GenericName=
+Icon=/opt/steamos-session/assets/icons/steamos-session-icon.png
+MimeType=
+Name[en_CA]=Return to GamepadUI
+Name=Return to GamepadUI
+Path=
+StartupNotify=true
+Terminal=false
+TerminalOptions=
+Type=Application
+X-KDE-SubstituteUID=false
+X-KDE-Username=

@@ -18,21 +18,19 @@
 # SteamOS Session Launchers
 # ------------------------------------------------
 export STEAMOS_SESSION_PATH="/opt/steamos-session"
-export STEAMOS_GAMEMODE="$STEAMOS_SESSION_PATH/steamos-gamemode-enhanced"
 export STEAMOS_SESSION_LAUNCHER="$STEAMOS_SESSION_PATH/steamos-session-launcher"
 export DESKTOP_AUTOLOGIN="startplasma-wayland"
 
 # Session Logic
 if [ "$(tty)" = "/dev/tty1" ]; then
-    udiskie-mount -a
-    clear
-    sudo $STEAMOS_GAMEMODE -s lavd
-    clear
-    $STEAMOS_SESSION_LAUNCHER
-    clear
-    sudo $STEAMOS_GAMEMODE -s off
-    clear
-    $DESKTOP_AUTOLOGIN
-    clear
-    exit
+    while true; do
+        clear
+        $DESKTOP_AUTOLOGIN
+        clear
+        $STEAMOS_SESSION_LAUNCHER
+        clear
+
+        # Optional: Prevent CPU throttling if the commands fail instantly
+        sleep 1
+    done
 fi

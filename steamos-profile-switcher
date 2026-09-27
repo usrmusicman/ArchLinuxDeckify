@@ -1,26 +1,17 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# ==============================================================================
-# UNIFIED STEAMOS SESSION PROFILE CONFIGURATOR (2026 EDITION)
-# ==============================================================================
-# Usage: ./profile-switcher.sh [amd|deck|fallback|nvidia-foss|nvidia-prop|nvidia-hybrid|intel]
-# This script writes a targeted configuration layer to the SteamOS session config.
-# ==============================================================================
-
-TARGET_CONFIG="/home/$USER/.config/steamos-session/steamos-session-config"
-mkdir -p "$(dirname "$TARGET_CONFIG")"
-
-PROFILE="${1,,}" # Convert input parameter to lowercase
+PROFILE="${1:-}"
+PROFILE="${PROFILE,,}" # Convert input parameter to lowercase
 
 if [[ -z "$PROFILE" ]]; then
-    echo "Error: Please specify a hardware profile target."
-    echo "Available choices: amd, deck, fallback, intel, nvidia-foss, nvidia-prop, nvidia-hybrid"
+    echo "Error: Please specify a hardware profile target." >&2
+    echo "Available choices: amd, deck, fallback, intel, nvidia-foss, nvidia-prop, nvidia-hybrid" >&2
     exit 1
 fi
 
-# ------------------------------------------------------------------------------
-# PROFILE CONFIGURATION GENERATION
-# ------------------------------------------------------------------------------
+STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
+mkdir -p "$(dirname "$STEAMOS_SESSION_CONFIG")"
 
 {
     echo "#!/usr/bin/env bash"
@@ -31,7 +22,6 @@ fi
     echo "# ------------------------------------------------"
     echo ""
 
-    # Hardware Specific Target Sizing Mapping
     case "$PROFILE" in
         "deck")
             echo "export SCREENWIDTH=1280"
@@ -73,7 +63,6 @@ fi
     echo "# Hardware Specific Toggles"
     echo "# ------------------------------------------------"
 
-    # Driver Specific Variables Injector
     case "$PROFILE" in
         "amd")
             echo "export mesa_glthread=true"
@@ -117,7 +106,6 @@ fi
     echo "# ------------------------------------------------"
     echo "export ENABLE_GAMESCOPE_WSI=1"
 
-    # Correcting internal flag based on FOSS Nvidia vs others
     if [[ "$PROFILE" == "nvidia-foss" ]]; then
         echo "export PROTON_ENABLE_HDR=0"
     else
@@ -169,7 +157,6 @@ fi
     echo "# Welcome Message"
     echo "# ------------------------------------------------"
 
-    # Mapped Welcome Messages (Restoring your customized coloring rules)
     case "$PROFILE" in
         "amd"|"deck")
             echo -e "echo -e \"\${RED}Starting steam with AMD GPU optimizations...\${NC}\""
@@ -191,6 +178,6 @@ fi
             ;;
     esac
 
-} > "$TARGET_CONFIG"
+} > "$STEAMOS_SESSION_CONFIG"
 
 echo "Success: Mapped target settings configuration cleanly onto profile target [$PROFILE]!"

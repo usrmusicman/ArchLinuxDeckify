@@ -1,113 +1,92 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# ==============================================================================
-# UNIFIED STEAMOS SESSION SCRIPT (2026 HIGH-PERFORMANCE EDITION)
-# ==============================================================================
-# This script manages GPU-specific environment variables, compositor settings,
-# and session launching. It uses a modular architecture to share core logic
-# between driver variations (e.g., NVIDIA Proprietary vs. NVIDIA Hybrid).
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# 1. INITIALIZATION & ARGUMENT PARSING
-# ------------------------------------------------------------------------------
-
-# Clear the screen
 clear
 
-# Check if TERM variable is empty and then set it.
-if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
+if [[ -z "${TERM:-}" || "$TERM" == "unknown" ]]; then
     export TERM=linux
 fi
 
-# Path for SteamOS specific session configurations for Deck users
-STEAMOS_SESSION_CONFIG="/home/$USER/.config/steamos-session/steamos-session-config"
+STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
 
-# Load session config if available; otherwise, the script uses the hardcoded defaults below
 if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
     source "$STEAMOS_SESSION_CONFIG"
 else
-    echo -e "${YLW}WARNING: Session config not found, using built-in defaults${NC}"
+    echo "WARNING: Session config not found at '$STEAMOS_SESSION_CONFIG', using built-in defaults" >&2
 fi
 
-# SteamOS Icon Path
+# Resolve Steam executable binary path (Native system binary -> Flatpak fallback)
+STEAM_CMD=()
+if command -v steam &>/dev/null; then
+    STEAM_CMD=("$(command -v steam)")
+elif flatpak info com.valvesoftware.Steam &>/dev/null; then
+    STEAM_CMD=("flatpak" "run" "com.valvesoftware.Steam")
+else
+    echo "Error: Steam is not installed via system package or Flatpak." >&2
+    exit 1
+fi
+
+# Ensure Gamescope compositor exists in PATH
+if ! command -v gamescope &>/dev/null; then
+    echo "Error: 'gamescope' binary was not found in PATH." >&2
+    exit 1
+fi
+
+STEAMOS_SELECT="/usr/local/bin/steamos-session/steamos-session-select"
+STEAMOS_LINK="$HOME/.local/bin/steamos-session-select"
 STEAMOS_ICON="/opt/steamos-session/assets/icons/steamos-session-icon.png"
 
-# Define Steam-specific command flags
-# We only use this if SESSION_BINARY ends up being steam
-STEAMOS_FLAGS="-gamepadui -steamos3 -steamos -steamdeck"
+if [[ -f "$STEAMOS_SELECT" ]]; then
+    mkdir -p "$(dirname "$STEAMOS_LINK")"
+    ln -sf "$STEAMOS_SELECT" "$STEAMOS_LINK"
+    cat2img
+fi
 
-# ------------------------------------------------------------------------------
-# 2. EXECUTION LOGIC (SYSTEM GPU SWITCH)
-# ------------------------------------------------------------------------------
+sleep 1
 
-# Show the SteamOS image in the tty terminal
-echo ""
-catimg $STEAMOS_ICON
-echo ""
-
-# Sleep for 3 seconds before starting Steam
-sleep 3
-
-# ------------------------------------------------------------------------------
-# 3. GAMESCOPE COMPOSITOR SETUP
-# ------------------------------------------------------------------------------
-
-# Fallback defaults (prevents Gamescope crash if configs are missing or paths are broken)
+# Fallback parameter defaults
 : "${RENDER_WIDTH:=1280}"
 : "${RENDER_HEIGHT:=720}"
 : "${SCREENWIDTH:=1280}"
 : "${SCREENHEIGHT:=720}"
 : "${REFRESHRATE:=60}"
-: "${ENABLE_HDR:-0}"
+: "${ENABLE_HDR:=0}"
 : "${HDR_SDR:=300}"
 : "${HDR_TONEMAP:=100}"
 : "${HDR_MAX:=800}"
 
-# Using an array to handle arguments cleanly without quoting issues.
+STEAMOS_FLAGS=("-gamepadui" "-steamos3" "-steamos" "-steamdeck")
+
 GS_ARGS=(
-  "-w" "$RENDER_WIDTH"      # Virtual width game sees
-  "-h" "$RENDER_HEIGHT"     # Virtual height game sees
-  "-W" "$SCREENWIDTH"       # Actual physical width
-  "-H" "$SCREENHEIGHT"      # Actual physical height
-  "-r" "$REFRESHRATE"       # Monitor Hz
-  "-f"                      # Fullscreen
-  "--adaptive-sync"         # VRR/G-Sync/FreeSync
-  "--immediate-flips"       # Lowest possible latency (Tearing allowed if out of VRR)
-  "--force-grab-cursor"     # Prevent mouse escaping the game window
-  "--grab"                  # Prevent mouse escaping the game window
-  "--mangoapp"              # Performance overlay support
-  "--steam"                 # Integration with Steam UI
-  "--xwayland-count" "2"    # Spin up multiple Xwayland instances
+  "-w" "$RENDER_WIDTH"
+  "-h" "$RENDER_HEIGHT"
+  "-W" "$SCREENWIDTH"
+  "-H" "$SCREENHEIGHT"
+  "-r" "$REFRESHRATE"
+  "-f"
+  "--adaptive-sync"
+  "--immediate-flips"
+  "--force-grab-cursor"
+  "--grab"
+  "--mangoapp"
+  "--steam"
+  "--xwayland-count" "2"
 )
 
-# HDR Settings
 HDR_ARGS=(
-  "--hdr-enabled"                   # Enable HDR Support
-  "--hdr-sdr-content-nits=$HDR_SDR" # Max brightness (nits) for SDR Content on HDR
-  "--hdr-itm-sdr-nits=$HDR_TONEMAP" # HDR inverse tonemap, minimum whitepoint (nits) value
-  "--hdr-itm-target-nits=$HDR_MAX"  # Max brightness (nits) for HDR content.
+  "--hdr-enabled"
+  "--hdr-sdr-content-nits=$HDR_SDR"
+  "--hdr-itm-sdr-nits=$HDR_TONEMAP"
+  "--hdr-itm-target-nits=$HDR_MAX"
 )
 
-# ------------------------------------------------------------------------------
-# 4. FINAL LAUNCH (TTY WAYLAND MODE)
-# ------------------------------------------------------------------------------
-
-# Force multiple xwayland sessions to fix bugs
 export STEAM_MULTIPLE_XWAYLANDS=1
 
-# Validate HDR variable before launching
-if [[ -z "$ENABLE_HDR" ]]; then
-  echo "Unrecognized value, please type a 0 or 1 for the variable ENABLE_HDR in the steamos-session-config"
-  exit 1
-fi
-
-# Launch Gamescope in the background (&) so the script can track its PID and monitor it
 if [[ "$ENABLE_HDR" == "0" ]]; then
-  gamescope "${GS_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS 2>/dev/null
+    exec gamescope "${GS_ARGS[@]}" -- "${STEAM_CMD[@]}" "${STEAMOS_FLAGS[@]}"
 elif [[ "$ENABLE_HDR" == "1" ]]; then
-  gamescope "${GS_ARGS[@]}" "${HDR_ARGS[@]}" -- /usr/bin/steam $STEAMOS_FLAGS 2>/dev/null
+    exec gamescope "${GS_ARGS[@]}" "${HDR_ARGS[@]}" -- "${STEAM_CMD[@]}" "${STEAMOS_FLAGS[@]}"
 else
-  echo "Arguments not valid please ensure all inputs are correct"
-  exit 1
+    echo "Error: Invalid ENABLE_HDR value '$ENABLE_HDR'. Must be 0 or 1." >&2
+    exit 1
 fi
