@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# Trigger a native graceful shutdown of the GamepadUI client
-steam -shutdown

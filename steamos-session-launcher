@@ -1,21 +1,39 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# Enable strict bash execution options:
+#set -euo pipefail
 
-clear
-
+# Set a baseline terminal emulator environment variable if launched from a headless TTY/display manager
 if [[ -z "${TERM:-}" || "$TERM" == "unknown" ]]; then
     export TERM=linux
 fi
 
+# Ensure XDG environment context exists for raw TTY execution
+if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
+
+# Define path for user-specific session configuration overrides
 STEAMOS_SESSION_CONFIG="$HOME/.config/steamos-session/steamos-session-config"
 
+# Clear the terminal screen buffer
+clear
+
+# Load custom config if present; fall back to hardcoded defaults with a warning if missing
 if [[ -f "$STEAMOS_SESSION_CONFIG" ]]; then
     source "$STEAMOS_SESSION_CONFIG"
 else
     echo "WARNING: Session config not found at '$STEAMOS_SESSION_CONFIG', using built-in defaults" >&2
 fi
 
-# Resolve Steam executable binary path (Native system binary -> Flatpak fallback)
+# Create a functional steamos-session-select script in PATH
+# Steam executes this helper when "Switch to Desktop" is clicked
+cat << 'EOF' > "$HOME/.local/bin/steamos-session-select"
+#!/usr/bin/env bash
+steam -shutdown
+EOF
+chmod +x "$HOME/.local/bin/steamos-session-select"
+
+# Locate the Steam binary executable (prefer native package, fall back to Flatpak)
 STEAM_CMD=()
 if command -v steam &>/dev/null; then
     STEAM_CMD=("$(command -v steam)")
@@ -26,53 +44,50 @@ else
     exit 1
 fi
 
-# Ensure Gamescope compositor exists in PATH
+# Ensure the Gamescope compositor binary is available in PATH
 if ! command -v gamescope &>/dev/null; then
     echo "Error: 'gamescope' binary was not found in PATH." >&2
     exit 1
 fi
 
-STEAMOS_SELECT="/usr/local/bin/steamos-session/steamos-session-select"
-STEAMOS_LINK="$HOME/.local/bin/steamos-session-select"
-STEAMOS_ICON="/opt/steamos-session/assets/icons/steamos-session-icon.png"
+# Set default parameters using shell parameter expansion
+: "${RENDER_WIDTH:=1280}"     # Internal game rendering resolution (width)
+: "${RENDER_HEIGHT:=720}"      # Internal game rendering resolution (height)
+: "${SCREENWIDTH:=1280}"       # Output display resolution (width)
+: "${SCREENHEIGHT:=720}"       # Output display resolution (height)
+: "${REFRESHRATE:=60}"         # Target display refresh rate in Hz
+: "${ENABLE_HDR:=0}"           # Enable HDR support (0 = disabled, 1 = enabled)
+: "${HDR_SDR:=300}"            # Target brightness for SDR content in nits
+: "${HDR_TONEMAP:=100}"        # Inverse tone mapping SDR content source nits
+: "${HDR_MAX:=800}"            # Maximum display peak luminance in nits
 
-if [[ -f "$STEAMOS_SELECT" ]]; then
-    mkdir -p "$(dirname "$STEAMOS_LINK")"
-    ln -sf "$STEAMOS_SELECT" "$STEAMOS_LINK"
-    cat2img
-fi
-
-sleep 1
-
-# Fallback parameter defaults
-: "${RENDER_WIDTH:=1280}"
-: "${RENDER_HEIGHT:=720}"
-: "${SCREENWIDTH:=1280}"
-: "${SCREENHEIGHT:=720}"
-: "${REFRESHRATE:=60}"
-: "${ENABLE_HDR:=0}"
-: "${HDR_SDR:=300}"
-: "${HDR_TONEMAP:=100}"
-: "${HDR_MAX:=800}"
-
-STEAMOS_FLAGS=("-gamepadui" "-steamos3" "-steamos" "-steamdeck")
-
-GS_ARGS=(
-  "-w" "$RENDER_WIDTH"
-  "-h" "$RENDER_HEIGHT"
-  "-W" "$SCREENWIDTH"
-  "-H" "$SCREENHEIGHT"
-  "-r" "$REFRESHRATE"
-  "-f"
-  "--adaptive-sync"
-  "--immediate-flips"
-  "--force-grab-cursor"
-  "--grab"
-  "--mangoapp"
-  "--steam"
-  "--xwayland-count" "2"
+# Standard Steam Deck UI flag for desktop Steam
+STEAMOS_FLAGS=(
+  "-gamepadui"                 # GampadUI for Big Picture Mode
+  "-steamos3"                  # SteamOS 3 Environment
 )
 
+# Core command arguments passed to Gamescope
+GS_ARGS=(
+  "-w" "$RENDER_WIDTH"         # Framebuffer width
+  "-h" "$RENDER_HEIGHT"        # Framebuffer height
+  "-W" "$SCREENWIDTH"          # Display output width
+  "-H" "$SCREENHEIGHT"         # Display output height
+  "-r" "$REFRESHRATE"          # Target refresh rate
+  "-f"                         # Start in fullscreen
+  "--adaptive-sync"            # Enable VRR / Adaptive Sync
+  "--immediate-flips"          # Allow tearing/immediate presentation for lower latency
+  "--force-grab-cursor"        # Restrict cursor within the compositor window
+  "--grab"                     # Lock keyboard/mouse focus
+  "--steam"                    # Enable Steam-specific compositor hooks
+)
+
+# Only append --mangoapp if the binary exists on the host system
+if command -v mangoapp &>/dev/null; then
+    GS_ARGS+=("--mangoapp")
+fi
+
+# High Dynamic Range (HDR) flags passed to Gamescope when HDR is toggled
 HDR_ARGS=(
   "--hdr-enabled"
   "--hdr-sdr-content-nits=$HDR_SDR"
@@ -80,18 +95,48 @@ HDR_ARGS=(
   "--hdr-itm-target-nits=$HDR_MAX"
 )
 
-# Mount all devices
-udiskie -a
+# Gracefully shut down Steam if an instance is already running
+if pgrep -x steam &>/dev/null || pgrep -f "com.valvesoftware.Steam" &>/dev/null; then
+    echo "Steam is currently running. Requesting shutdown..." >&2
+    "${STEAM_CMD[@]}" -shutdown &>/dev/null || true
 
-# Run multiple Xwayland instances
-export STEAM_MULTIPLE_XWAYLANDS=1
+    # Wait until all background processes have fully terminated
+    while pgrep -x steam &>/dev/null || pgrep -f "com.valvesoftware.Steam" &>/dev/null; do
+        sleep 1
+    done
+fi
 
-# Run commands in gamescope
-if [[ "$ENABLE_HDR" == "0" ]]; then
-    exec gamescope "${GS_ARGS[@]}" -- "${STEAM_CMD[@]}" "${STEAMOS_FLAGS[@]}"
-elif [[ "$ENABLE_HDR" == "1" ]]; then
-    exec gamescope "${GS_ARGS[@]}" "${HDR_ARGS[@]}" -- "${STEAM_CMD[@]}" "${STEAMOS_FLAGS[@]}"
-else
+# Start a background process watcher to catch Steam exiting Gamepad UI
+(
+    sleep 4
+    while pgrep -x gamescope &>/dev/null; do
+        # If Steam is running but no longer in -gamepadui mode (e.g. user clicked Exit Gamepad View)
+        if pgrep -x steam &>/dev/null && ! pgrep -f "steam.*-gamepadui" &>/dev/null; then
+            pkill -x gamescope &>/dev/null || true
+            break
+        fi
+        sleep 1
+    done
+) &
+WATCHER_PID=$!
+
+# Build final execution array dynamically based on options
+LAUNCH_CMD=("gamescope" "${GS_ARGS[@]}")
+
+if [[ "$ENABLE_HDR" == "1" ]]; then
+    LAUNCH_CMD+=("${HDR_ARGS[@]}")
+elif [[ "$ENABLE_HDR" != "0" ]]; then
     echo "Error: Invalid ENABLE_HDR value '$ENABLE_HDR'. Must be 0 or 1." >&2
     exit 1
+fi
+
+LAUNCH_CMD+=("--" "${STEAM_CMD[@]}" "${STEAMOS_FLAGS[@]}")
+
+echo "==> Initializing Gamescope Interface on TTY..." >&2
+
+# Execute Gamescope with process replacement, implementing session dbus context if missing
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+    exec dbus-run-session -- "${LAUNCH_CMD[@]}"
+else
+    exec "${LAUNCH_CMD[@]}"
 fi
