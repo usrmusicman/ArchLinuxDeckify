@@ -28,6 +28,7 @@ fi
 
 # Create a functional steamos-session-select script in PATH
 # Steam executes this helper when "Switch to Desktop" is clicked
+mkdir -p $HOME/.local/bin
 cat << 'EOF' > "$HOME/.local/bin/steamos-session-select"
 #!/usr/bin/env bash
 steam -shutdown
