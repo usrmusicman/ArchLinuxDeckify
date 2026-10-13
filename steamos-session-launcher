@@ -26,6 +26,9 @@ else
     echo "WARNING: Session config not found at '$STEAMOS_SESSION_CONFIG', using built-in defaults" >&2
 fi
 
+# Mount all storage devices
+udiskie -a &
+
 # Create a functional steamos-session-select script in PATH
 # Steam executes this helper when "Switch to Desktop" is clicked
 mkdir -p $HOME/.local/bin
