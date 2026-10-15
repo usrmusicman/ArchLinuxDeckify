@@ -158,6 +158,20 @@ do_normal() {
 }
 
 # --------------------------
+# LAUNCH GAMEPADUI SHELL LOGIC
+# --------------------------
+
+do_launch_gamepadui_shell() {
+    local launcher="${BASEDIR}/steamos-session-launcher"
+    if [[ -x "$launcher" ]]; then
+        exec "$launcher"
+    else
+        echo "Error: steamos-session-launcher not found or not executable at $launcher" >&2
+        exit 1
+    fi
+}
+
+# --------------------------
 # SYSTEM PROFILE SWITCHER LOGIC
 # --------------------------
 
@@ -320,6 +334,11 @@ while [[ $# -gt 0 ]]; do
             do_normal
             shift
             ;;
+        --launch-gamepadui-shell)
+            RUN_GUI=false
+            do_launch_gamepadui_shell
+            shift
+            ;;
         --profile)
             RUN_GUI=false
             apply_system_profile "$2"
@@ -339,11 +358,12 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $(basename "$0") [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --gamepadui            Configure and switch to GamepadUI session"
-            echo "  --normal               Configure and switch to Normal session"
-            echo "  --profile <profile>    Switch system GPU profile (amd, fallback, intel, nvidia-foss, nvidia-prop, nvidia-hybrid)"
-            echo "  --install-shortcut     Install application desktop shortcut"
-            echo "  --uninstall-shortcut   Uninstall application desktop shortcut"
+            echo "  --gamepadui                Configure and switch to GamepadUI session"
+            echo "  --normal                   Configure and switch to Normal session"
+            echo "  --launch-gamepadui-shell   Launch GamepadUI Shell script"
+            echo "  --profile <profile>        Switch system GPU profile (amd, fallback, intel, nvidia-foss, nvidia-prop, nvidia-hybrid)"
+            echo "  --install-shortcut         Install application desktop shortcut"
+            echo "  --uninstall-shortcut       Uninstall application desktop shortcut"
             echo "  --help, -h             Show this help message"
             exit 0
             ;;
@@ -367,6 +387,7 @@ while true; do
         "toggle_sessions"    "Toggle Sessions" \
         "switch_profile"     "Switch System Profile" \
         "create_shortcut"    "Create Application Shortcut" \
+        "launch_shell"       "Launch GamepadUI Shell" \
         "exit"               "Exit")
 
     case "$CHOICE" in
@@ -413,6 +434,10 @@ while true; do
                 uninstall) uninstall_shortcut ;;
                 back|"")   ;;
             esac
+            ;;
+
+        launch_shell)
+            launch_in_terminal "'$SCRIPT_PATH' --launch-gamepadui-shell" "Launch GamepadUI Shell"
             ;;
 
         exit|"")
