@@ -106,7 +106,7 @@ HDR_ARGS=(
 # Gracefully shut down Steam if an instance is already running
 if pgrep -x steam &>/dev/null || pgrep -f "com.valvesoftware.Steam" &>/dev/null; then
     echo "Steam is currently running. Requesting shutdown..." >&2
-    "${STEAM_CMD[@]}" -shutdown &>/dev/null || true
+    "${STEAM_CMD[@]}" -shutdown 2>/dev/null || true
 
     # Wait until all background processes have fully terminated
     while pgrep -x steam &>/dev/null || pgrep -f "com.valvesoftware.Steam" &>/dev/null; do
@@ -140,11 +140,11 @@ fi
 
 LAUNCH_CMD+=("--" "${STEAM_CMD[@]}" "${STEAMOS_FLAGS[@]}")
 
-echo "==> Initializing Gamescope Interface on TTY..." >&2
+echo "==> Initializing Gamescope GamepadUI Interface..." >&2
 
 # Execute Gamescope with process replacement, implementing session dbus context if missing
 if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
-    exec dbus-run-session -- "${LAUNCH_CMD[@]}"
+    exec dbus-run-session -- "${LAUNCH_CMD[@]}" 2>/dev/null
 else
-    exec "${LAUNCH_CMD[@]}"
+    exec "${LAUNCH_CMD[@]}" 2>/dev/null
 fi
