@@ -222,6 +222,9 @@ apply_system_profile() {
                 echo "export mesa_glthread=true"
                 ;;
             "nvidia-prop"|"nvidia-hybrid")
+                if [[ "$profile" == "nvidia-hybrid" ]]; then
+                    echo "export __NV_PRIME_RENDER_OFFLOAD=1"
+                fi
                 echo "export __GL_MaxFramesAllowed=1"
                 echo "export __GL_GSYNC_ALLOWED=1"
                 echo "export __GL_SHADER_DISK_CACHE=1"
