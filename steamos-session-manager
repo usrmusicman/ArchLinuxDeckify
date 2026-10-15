@@ -1,0 +1,421 @@
+#!/usr/bin/env bash
+
+# ==============================================================================
+# SteamOS Session Manager
+# Styled after pipewire-control-gui with Session Toggling & Profile Switching
+# ==============================================================================
+
+BASEDIR="/opt/steamos-session"
+STEAMOS_SESSION_CONFIG="${HOME}/.config/steamos-session/steamos-session-config"
+
+# --------------------------
+# INITIALIZATION & ENVIRONMENT
+# --------------------------
+
+if [[ -z "$TERM" || "$TERM" == "unknown" ]]; then
+    export TERM=linux
+fi
+
+REAL_USER="${SUDO_USER:-$USER}"
+REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+REAL_HOME="${REAL_HOME:-/home/$REAL_USER}"
+
+CYN='\033[0;36m'
+NC='\033[0m'
+
+# --------------------------
+# TERMINAL DISPATCH HELPER (For Root/Sudo Actions)
+# --------------------------
+
+launch_in_terminal() {
+    local cmd="$1"
+    local title="${2:-SteamOS Session Action}"
+
+    local tmp_script
+    tmp_script=$(mktemp /tmp/session_mgr_XXXXXX.sh)
+    chmod +x "$tmp_script"
+
+    cat << EOF > "$tmp_script"
+#!/usr/bin/env bash
+echo -e "${CYN}============================================================${NC}"
+echo -e "${CYN} SteamOS Session Manager: $title ${NC}"
+echo -e "${CYN}============================================================${NC}\n"
+$cmd
+echo ""
+read -p "Press [Enter] to close this window..."
+EOF
+
+    if command -v xdg-terminal-exec &>/dev/null; then
+        xdg-terminal-exec "$tmp_script"
+    elif command -v ptyxis &>/dev/null; then
+        ptyxis -- "$tmp_script"
+    elif command -v konsole &>/dev/null; then
+        konsole -e "$tmp_script"
+    elif command -v gnome-terminal &>/dev/null; then
+        gnome-terminal -- "$tmp_script"
+    elif command -v xfce4-terminal &>/dev/null; then
+        xfce4-terminal -e "$tmp_script"
+    elif command -v alacritty &>/dev/null; then
+        alacritty -e "$tmp_script"
+    elif command -v kitty &>/dev/null; then
+        kitty "$tmp_script"
+    elif command -v xterm &>/dev/null; then
+        xterm -e "$tmp_script"
+    else
+        bash "$tmp_script"
+    fi
+
+    ( sleep 5 && rm -f "$tmp_script" ) &
+}
+
+# --------------------------
+# GUI MENU WRAPPER (kdialog -> zenity -> fallback text)
+# --------------------------
+
+gui_menu() {
+    local title="$1"
+    local prompt="$2"
+    shift 2
+
+    if command -v kdialog &>/dev/null; then
+        kdialog --title "$title" --menu "$prompt" "$@" 2>/dev/null
+    elif command -v zenity &>/dev/null; then
+        local zen_args=()
+        while [[ $# -gt 0 ]]; do
+            zen_args+=("$1" "$2")
+            shift 2
+        done
+        zenity --list --title="$title" --text="$prompt" --column="ID" --column="Option" --hide-column=1 "${zen_args[@]}" 2>/dev/null
+    else
+        echo -e "\n=== $title ==="
+        echo -e "$prompt\n"
+        local options=()
+        local tags=()
+        local i=1
+        while [[ $# -gt 0 ]]; do
+            tags+=("$1")
+            options+=("$2")
+            echo "$i) $2"
+            shift 2
+            ((i++))
+        done
+        echo ""
+        read -p "Select choice [1-${#options[@]}]: " choice
+        if [[ "$choice" -ge 1 && "$choice" -le "${#options[@]}" ]]; then
+            echo "${tags[$((choice-1))]}"
+        fi
+    fi
+}
+
+# --------------------------
+# SESSION TOGGLE LOGIC [--gamepadui / --normal]
+# --------------------------
+
+do_gamepadui() {
+    cp "${BASEDIR}/config/bash/.bash_profile.gamepadui" "${REAL_HOME}/.bash_profile"
+    if [[ -x "/usr/bin/plasmalogin" ]]; then
+        sudo systemctl mask plasmalogin.service
+        sudo systemctl unmask getty@tty1.service
+        systemctl reboot
+    elif [[ -x "/usr/bin/gdm" ]]; then
+        sudo systemctl mask gdm.service
+        sudo systemctl unmask getty@tty1.service
+        systemctl reboot
+    elif [[ -x "/usr/bin/lightdm" ]]; then
+        sudo systemctl mask lightdm.service
+        sudo systemctl unmask getty@tty1.service
+        systemctl reboot
+    elif [[ -x "/usr/bin/sddm" ]]; then
+        sudo systemctl mask sddm.service
+        sudo systemctl unmask getty@tty1.service
+        systemctl reboot
+    else
+        echo -e "Display session manager not supported"
+    fi
+}
+
+do_normal() {
+    cp "${BASEDIR}/config/bash/.bash_profile.normal" "${REAL_HOME}/.bash_profile"
+    if [[ -x "/usr/bin/plasmalogin" ]]; then
+        sudo systemctl unmask plasmalogin.service
+        sudo systemctl mask getty@tty1.service
+        systemctl reboot
+    elif [[ -x "/usr/bin/gdm" ]]; then
+        sudo systemctl unmask gdm.service
+        sudo systemctl mask getty@tty1.service
+        systemctl reboot
+    elif [[ -x "/usr/bin/lightdm" ]]; then
+        sudo systemctl unmask lightdm.service
+        sudo systemctl mask getty@tty1.service
+        systemctl reboot
+    elif [[ -x "/usr/bin/sddm" ]]; then
+        sudo systemctl unmask sddm.service
+        sudo systemctl mask getty@tty1.service
+        systemctl reboot
+    else
+        echo -e "Display session manager not supported"
+    fi
+}
+
+# --------------------------
+# SYSTEM PROFILE SWITCHER LOGIC
+# --------------------------
+
+apply_system_profile() {
+    local profile="${1:-}"
+    profile="${profile,,}"
+
+    if [[ -z "$profile" ]]; then
+        echo "Error: Please specify a hardware profile target." >&2
+        echo "Available choices: amd, fallback, intel, nvidia-foss, nvidia-prop, nvidia-hybrid" >&2
+        exit 1
+    fi
+
+    mkdir -p "$(dirname "$STEAMOS_SESSION_CONFIG")"
+
+    {
+        echo "#!/usr/bin/env bash"
+        echo "# Generated by SteamOS Session Manager"
+        echo ""
+        echo "# ------------------------------------------------"
+        echo "# MONITOR & UPSCALING & POWER & RTIRQ PRIO & AUDIO"
+        echo "# ------------------------------------------------"
+        echo ""
+
+        case "$profile" in
+            "amd"|"fallback"|"intel"|"nvidia-foss"|"nvidia-prop"|"nvidia-hybrid")
+                echo "export SCREENWIDTH=1920"
+                echo "export SCREENHEIGHT=1080"
+                echo "export REFRESHRATE=60"
+                echo "export RENDER_WIDTH=1920"
+                echo "export RENDER_HEIGHT=1080"
+                ;;
+            *)
+                echo "Error: Unrecognized profile '$profile'." >&2
+                exit 1
+                ;;
+        esac
+
+        echo ""
+        echo "export RT_PRIO_USB=95"
+        echo "export RT_PRIO_SOUND=90"
+        echo "export RT_PRIO_PIPEWIRE=85"
+        echo ""
+        echo "export ENABLE_HDR=0"
+        echo "export HDR_SDR=300"
+        echo "export HDR_TONEMAP=300"
+        echo "export HDR_MAX=800"
+        echo ""
+
+        case "$profile" in
+            "amd")
+                echo "export mesa_glthread=true"
+                echo "export RADV_PERFTEST=sam,rt"
+                echo "export RADV_SHADER_CACHE=1"
+                ;;
+            "fallback")
+                echo "export mesa_glthread=true"
+                ;;
+            "nvidia-foss")
+                echo "export MESA_LOADER_DRIVER_OVERRIDE=nouveau"
+                echo "export NVK_PERFTEST=sam,rt"
+                echo "export mesa_glthread=true"
+                ;;
+            "nvidia-prop"|"nvidia-hybrid")
+                echo "export __GL_MaxFramesAllowed=1"
+                echo "export __GL_GSYNC_ALLOWED=1"
+                echo "export __GL_SHADER_DISK_CACHE=1"
+                echo "export __GL_SHADER_DISK_CACHE_PATH=\"\$HOME/.cache/nvidia\""
+                echo "export __GL_VRR_ALLOWED=1"
+                echo "export __GL_YIELD=\"USLEEP\""
+                echo "export __GL_WRITE_COMBINED_MEMORY=1"
+                echo "export __GLX_VENDOR_LIBRARY_NAME=nvidia"
+                echo "export PROTON_ENABLE_NVAPI=1"
+                echo "export PROTON_HIDE_NVIDIA_GPU=0"
+                ;;
+            "intel")
+                echo "export ANV_ENABLE_FBC=1"
+                echo "export mesa_glthread=true"
+                ;;
+        esac
+
+        echo "export ENABLE_GAMESCOPE_WSI=1"
+        if [[ "$profile" == "nvidia-foss" ]]; then
+            echo "export PROTON_ENABLE_HDR=0"
+        else
+            echo "export PROTON_ENABLE_HDR=1"
+        fi
+        echo "export DXVK_HDR=1"
+        echo "export ENABLE_HDR_WSI=1"
+        echo "export vblank_mode=0"
+        echo "export MESA_VK_WSI_PRESENT_MODE=mailbox"
+        echo "export VKD3D_CONFIG=dxr"
+        echo "export WINENTSYNC=1"
+        echo "export PROTON_USE_NTSYNC=1"
+        echo "export PROTON_USE_WOW64=0"
+
+        if [[ "$profile" == "nvidia-prop" || "$profile" == "nvidia-hybrid" ]]; then
+            echo "export PROTON_NVIDIA_LIBS_NO_32BIT=0"
+        fi
+
+    } > "$STEAMOS_SESSION_CONFIG"
+
+    echo "Success: Applied profile [$profile] successfully!"
+}
+
+# --------------------------
+# APPLICATION SHORTCUT LOGIC
+# --------------------------
+
+install_shortcut() {
+    local app_dir="${REAL_HOME}/.local/share/applications"
+    mkdir -p "$app_dir"
+    local desktop_file="$app_dir/steamos-session-manager.desktop"
+
+    cat << EOF > "$desktop_file"
+[Desktop Entry]
+Name=SteamOS Session Manager
+Comment=Manage SteamOS Sessions and System Profiles
+Exec=${BASEDIR}/steamos-session-manager
+Icon=${BASEDIR}/assets/icons/steamos-session-icon.png
+Terminal=false
+Type=Application
+Categories=Settings;System;
+EOF
+
+    chmod +x "$desktop_file"
+    chown -R "$REAL_USER":"$REAL_USER" "$desktop_file" 2>/dev/null
+    echo "Success: Desktop shortcut installed at $desktop_file"
+}
+
+uninstall_shortcut() {
+    local desktop_file="${REAL_HOME}/.local/share/applications/steamos-session-manager.desktop"
+    if [[ -f "$desktop_file" ]]; then
+        rm -f "$desktop_file"
+        echo "Success: Desktop shortcut removed from $desktop_file"
+    else
+        echo "Notice: Desktop shortcut does not exist at $desktop_file"
+    fi
+}
+
+# --------------------------
+# CLI ARGUMENT ROUTING
+# --------------------------
+
+SCRIPT_PATH="$(readlink -f "$0")"
+RUN_GUI=true
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --gamepadui)
+            RUN_GUI=false
+            do_gamepadui
+            shift
+            ;;
+        --normal)
+            RUN_GUI=false
+            do_normal
+            shift
+            ;;
+        --profile)
+            RUN_GUI=false
+            apply_system_profile "$2"
+            shift 2
+            ;;
+        --install-shortcut)
+            RUN_GUI=false
+            install_shortcut
+            shift
+            ;;
+        --uninstall-shortcut)
+            RUN_GUI=false
+            uninstall_shortcut
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $(basename "$0") [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --gamepadui            Configure and switch to GamepadUI session"
+            echo "  --normal               Configure and switch to Normal session"
+            echo "  --profile <profile>    Switch system GPU profile (amd, fallback, intel, nvidia-foss, nvidia-prop, nvidia-hybrid)"
+            echo "  --install-shortcut     Install application desktop shortcut"
+            echo "  --uninstall-shortcut   Uninstall application desktop shortcut"
+            echo "  --help, -h             Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+if [ "$RUN_GUI" = false ]; then
+    exit 0
+fi
+
+# --------------------------
+# MAIN INTERACTIVE GUI LOOP
+# --------------------------
+
+while true; do
+    CHOICE=$(gui_menu "SteamOS Session Manager" "Choose an option from the main menu:" \
+        "toggle_sessions"    "Toggle Sessions" \
+        "switch_profile"     "Switch System Profile" \
+        "create_shortcut"    "Create Application Shortcut" \
+        "exit"               "Exit")
+
+    case "$CHOICE" in
+        toggle_sessions)
+            SESSION_CHOICE=$(gui_menu "Toggle Sessions" "Select session configuration:" \
+                "gamepadui"  "Configure GamepadUI" \
+                "normal"     "Configure Normal Session" \
+                "back"       "Back to Main Menu")
+
+            case "$SESSION_CHOICE" in
+                gamepadui) launch_in_terminal "sudo '$SCRIPT_PATH' --gamepadui" "Configure GamepadUI Session" ;;
+                normal)    launch_in_terminal "sudo '$SCRIPT_PATH' --normal" "Configure Normal Session" ;;
+                back|"")   ;;
+            esac
+            ;;
+
+        switch_profile)
+            PROFILE_CHOICE=$(gui_menu "Switch System Profile" "Select GPU profile configuration:" \
+                "amd"            "AMD (AMD GPU Optimizations)" \
+                "fallback"       "Generic (Fallback Optimizations)" \
+                "nvidia-foss"    "Nvidia Open Source (Nouveau)" \
+                "nvidia-hybrid"  "Nvidia Hybrid Graphics" \
+                "nvidia-prop"    "Nvidia Official Drivers" \
+                "intel"          "Intel (Intel GPU Optimizations)" \
+                "back"           "Back to Main Menu")
+
+            case "$PROFILE_CHOICE" in
+                amd|fallback|nvidia-foss|nvidia-hybrid|nvidia-prop|intel)
+                    apply_system_profile "$PROFILE_CHOICE"
+                    ;;
+                back|"")
+                    ;;
+            esac
+            ;;
+
+        create_shortcut)
+            SHORTCUT_CHOICE=$(gui_menu "Create Application Shortcut" "Manage application shortcut:" \
+                "install"    "Install Shortcut" \
+                "uninstall"  "Uninstall Shortcut" \
+                "back"       "Back to Main Menu")
+
+            case "$SHORTCUT_CHOICE" in
+                install)   install_shortcut ;;
+                uninstall) uninstall_shortcut ;;
+                back|"")   ;;
+            esac
+            ;;
+
+        exit|"")
+            break
+            ;;
+    esac
+done
+
+exit 0
